@@ -7,7 +7,7 @@ DEBUG_FLAGS = -g -O0
 
 SRCDIR = src
 BUILDDIR = build
-TARGETS = jalebi namak-pare
+TARGETS = jalebi namak-paare
 
 PREFIX = /usr/local
 BINDIR = $(PREFIX)/bin

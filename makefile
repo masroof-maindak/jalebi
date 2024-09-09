@@ -9,7 +9,7 @@ debug: clean $(TARGETS)
 jalebi: $(BUILDDIR)/server.o
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
-namak-pare: $(BUILDDIR)/client.o
+namak-paare: $(BUILDDIR)/client.o
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.c
@@ -19,13 +19,13 @@ $(BUILDDIR)/%.o: $(SRCDIR)/%.c
 install: all
 	install -d $(BINDIR)
 	install -m 755 jalebi $(BINDIR)
-	install -m 755 namak-pare $(BINDIR)
+	install -m 755 namak-paare $(BINDIR)
 	
 uninstall:
 	rm -f $(BINDIR)/jalebi
-	rm -f $(BINDIR)/namak-pare
+	rm -f $(BINDIR)/namak-paare
 
 clean:
-	rm -f jalebi namak-pare $(BUILDDIR)/*.o
+	rm -f $(TARGETS) $(BUILDDIR)/*.o
 
 .PHONY: all clean install uninstall
