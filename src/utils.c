@@ -26,8 +26,7 @@ char *copy_string(const char *str) {
 
 void download(char *filename, size_t bytes, int sockfd) {
 	FILE *fp;
-	int bytesRead;
-	int toRead;
+	int bytesRead, toRead;
 	char *buf;
 
 	if ((fp = fopen(filename, "b")) == NULL) {
