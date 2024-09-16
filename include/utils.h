@@ -9,6 +9,7 @@
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
+void ensure_srv_dir_exists();
 char *copy_string(const char *str);
 void download(char *filename, size_t bytes, int sockfd);
 

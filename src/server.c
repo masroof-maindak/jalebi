@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <dirent.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -11,7 +12,58 @@
 #include "../include/server.h"
 #include "../include/utils.h"
 
+void view() {
+	DIR *d;
+	char **ent, *buf;
+	int idx, count, eAlloc;
+	struct dirent *entry;
+
+	if ((d = opendir("srv")) == NULL) {
+		perror("opendir()");
+		return;
+	}
+
+	idx = count = 0;
+	eAlloc		= 8;
+	ent			= malloc(eAlloc * sizeof(char *));
+	buf			= malloc(BUFSIZE);
+
+	if (ent == NULL) {
+		perror("malloc()");
+		closedir(d);
+		return;
+	}
+
+	while ((entry = readdir(d)) != NULL) {
+
+		if (count >= eAlloc) {
+			eAlloc *= 2;
+			if ((ent = realloc(realloc, eAlloc * sizeof(char *))) == NULL) {
+				perror("realloc()");
+				closedir(d);
+				return;
+			}
+		}
+
+		/* TODO - write file name and info */
+	}
+
+	return;
+}
+
+int identifyRequest(char *type) {
+	if (!strcmp(type, "VIEW"))
+		return 1;
+	else if (!strcmp(type, "DOWNLOAD"))
+		return 2;
+	else if (!strcmp(type, "UPLOAD"))
+		return 3;
+	return -1;
+}
+
 int main() {
+	ensure_srv_dir_exists();
+
 	int sfd, cfd, reuse;
 	ssize_t bytesRead;
 	char *buf;
@@ -68,7 +120,7 @@ int main() {
 			exit(7);
 		}
 
-		printf("Client sent: %s", buf);
+		/* TODO - identify request */
 
 		char *ret = copy_string(buf);
 

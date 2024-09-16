@@ -1,9 +1,9 @@
+#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 
-#include "../include/bool.h"
 #include "../include/utils.h"
 
 char *copy_string(const char *str) {
@@ -60,4 +60,16 @@ void download(char *filename, size_t bytes, int sockfd) {
 cleanup:
 	fclose(fp);
 	return;
+}
+
+void ensure_srv_dir_exists() {
+	char *hostDir = "srv";
+
+	struct stat st = {0};
+	if (stat(hostDir, &st) == -1) {
+		if (mkdir(hostDir, 0700) == -1) {
+			perror("mkdir()");
+			return;
+		}
+	}
 }
