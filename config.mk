@@ -14,3 +14,5 @@ BINDIR = $(PREFIX)/bin
 
 SRCS = $(wildcard ${SRCDIR}/*.c)
 OBJS = ${SRCS:${SRCDIR}/%.c=${BUILDDIR}/%.o}
+SERVER_OBJS = $(filter-out $(BUILDDIR)/client.o,$(OBJS))
+CLIENT_OBJS = $(filter-out $(BUILDDIR)/server.o,$(OBJS))

@@ -6,11 +6,11 @@ all: $(TARGETS)
 debug: CFLAGS += $(DEBUG_FLAGS)
 debug: clean $(TARGETS)
 
-jalebi: $(BUILDDIR)/server.o
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+jalebi: $(SERVER_OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-namak-paare: $(BUILDDIR)/client.o
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+namak-paare: $(CLIENT_OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.c
 	@mkdir -p $(BUILDDIR)
