@@ -6,14 +6,14 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include "../include/server.h"
 #include "../include/utils.h"
 
-#define BUFSIZE 1024
-
 int main() {
-	int sfd, cfd, reuse, bytesRead;
+	int sfd, cfd, reuse;
+	ssize_t bytesRead;
 	char *buf;
 	struct sockaddr_in saddr;
 	struct sockaddr_storage caddr;
@@ -60,7 +60,7 @@ int main() {
 			exit(6);
 		}
 
-		bytesRead = recv(sfd, buf, BUFSIZE, 0);
+		bytesRead = recv(cfd, buf, BUFSIZE, 0);
 
 		if (bytesRead == -1) {
 			free(buf);
@@ -69,8 +69,26 @@ int main() {
 		}
 
 		printf("Client sent: %s", buf);
+
+		char *ret = copy_string(buf);
+
+		if (ret == NULL) {
+			free(buf);
+			exit(8);
+		}
+
+		ret = copy_string(buf);
+		strcat(ret, "...");
+
+		if ((send(cfd, ret, sizeof(ret), 0)) == -1) {
+			perror("send()");
+			exit(9);
+		}
+
+		free(ret);
 	}
 
+	close(sfd);
 	free(buf);
 	return 0;
 }
