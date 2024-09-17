@@ -12,43 +12,56 @@
 #include "../include/server.h"
 #include "../include/utils.h"
 
-void view() {
+#define INVALID_REQUEST_MESSAGE "Error: Invalid request!"
+
+int view(int cfd) {
 	DIR *d;
-	char **ent, *buf;
-	int idx, count, eAlloc;
+	char *buf, *tmp;
+	char fileInfo[264];
+	int idx = 0, fileNameLen, fileSize, bufSize = BUFSIZE;
 	struct dirent *entry;
 
-	if ((d = opendir("srv")) == NULL) {
+	if ((d = opendir(HOSTDIR)) == NULL) {
 		perror("opendir()");
-		return;
+		return 1;
 	}
 
-	idx = count = 0;
-	eAlloc		= 8;
-	ent			= malloc(eAlloc * sizeof(char *));
-	buf			= malloc(BUFSIZE);
-
-	if (ent == NULL) {
+	if ((buf = malloc(BUFSIZE)) == NULL) {
 		perror("malloc()");
 		closedir(d);
-		return;
+		return 2;
 	}
 
 	while ((entry = readdir(d)) != NULL) {
 
-		if (count >= eAlloc) {
-			eAlloc *= 2;
-			if ((ent = realloc(realloc, eAlloc * sizeof(char *))) == NULL) {
+		fileNameLen = entry->d_reclen;
+		int retEntryLen =
+			fileNameLen + 3 + 3; // for " - " and tmp hardcoded size of 100;
+
+		/* if idx is about to surpass bufSize, double it */
+		if (idx + retEntryLen > bufSize) {
+			bufSize *= 2;
+			if ((tmp = realloc(buf, bufSize)) == NULL) {
 				perror("realloc()");
 				closedir(d);
-				return;
+				free(buf);
+				return 3;
 			}
 		}
 
-		/* TODO - write file name and info */
+		sprintf(fileInfo, "%s - %d", entry->d_name,
+				100); // format the entry into fileInfo
+		memcpy(buf + idx, fileInfo, retEntryLen); // copy the entry into buf
+		idx += retEntryLen;
 	}
 
-	return;
+	if ((send(cfd, buf, BUFSIZE, 0)) == -1) {
+		perror("send()");
+		closedir(d);
+		return 3;
+	}
+
+	return closedir(d);
 }
 
 int identifyRequest(char *type) {
@@ -64,7 +77,7 @@ int identifyRequest(char *type) {
 int main() {
 	ensure_srv_dir_exists();
 
-	int sfd, cfd, reuse;
+	int sfd, cfd, reuse, reqType;
 	ssize_t bytesRead;
 	char *buf;
 	struct sockaddr_in saddr;
@@ -120,17 +133,28 @@ int main() {
 			exit(7);
 		}
 
-		/* TODO - identify request */
+		printf("They sent: %s", buf);
 
-		char *ret = copy_string(buf);
+		/* TODO - proper request type identification later */
+		/* NOTE - for now, it is assumed the client will only pass 'VIEW' */
+		char *ret = malloc(BUFSIZE);
 
-		if (ret == NULL) {
-			free(buf);
-			exit(8);
+		reqType = identifyRequest(buf);
+
+		switch (reqType) {
+			case 1:
+				view(cfd);
+				memcpy(ret, "success", 7);
+				break;
+			case 2:
+				memcpy(ret, "idiot", 5);
+				break;
+			case 3:
+				memcpy(ret, "idiot", 5);
+				break;
+			default:
+				memcpy(ret, INVALID_REQUEST_MESSAGE, sizeof(INVALID_REQUEST_MESSAGE));
 		}
-
-		ret = copy_string(buf);
-		strcat(ret, "...");
 
 		if ((send(cfd, ret, sizeof(ret), 0)) == -1) {
 			perror("send()");
