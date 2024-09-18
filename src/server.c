@@ -1,5 +1,4 @@
 #include <arpa/inet.h>
-#include <dirent.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -12,60 +11,8 @@
 #include "../include/server.h"
 #include "../include/utils.h"
 
-#define INVALID_REQUEST_MESSAGE "Error: Invalid request!"
-
-int view(int cfd) {
-	DIR *d;
-	char *buf, *tmp;
-	char fileInfo[264];
-	int idx = 0, fileNameLen, fileSize, bufSize = BUFSIZE;
-	struct dirent *entry;
-
-	if ((d = opendir(HOSTDIR)) == NULL) {
-		perror("opendir()");
-		return 1;
-	}
-
-	if ((buf = malloc(BUFSIZE)) == NULL) {
-		perror("malloc()");
-		closedir(d);
-		return 2;
-	}
-
-	while ((entry = readdir(d)) != NULL) {
-
-		fileNameLen = entry->d_reclen;
-		int retEntryLen =
-			fileNameLen + 3 + 3; // for " - " and tmp hardcoded size of 100;
-
-		/* if idx is about to surpass bufSize, double it */
-		if (idx + retEntryLen > bufSize) {
-			bufSize *= 2;
-			if ((tmp = realloc(buf, bufSize)) == NULL) {
-				perror("realloc()");
-				closedir(d);
-				free(buf);
-				return 3;
-			}
-		}
-
-		sprintf(fileInfo, "%s - %d", entry->d_name,
-				100); // format the entry into fileInfo
-		memcpy(buf + idx, fileInfo, retEntryLen); // copy the entry into buf
-		idx += retEntryLen;
-	}
-
-	if ((send(cfd, buf, BUFSIZE, 0)) == -1) {
-		perror("send()");
-		closedir(d);
-		return 3;
-	}
-
-	return closedir(d);
-}
-
 int identifyRequest(char *type) {
-	if (!strcmp(type, "VIEW"))
+	if (!strncmp(type, "VIEW", 4))
 		return 1;
 	else if (!strcmp(type, "DOWNLOAD"))
 		return 2;
@@ -142,21 +89,22 @@ int main() {
 		reqType = identifyRequest(buf);
 
 		switch (reqType) {
-			case 1:
-				view(cfd);
-				memcpy(ret, "success", 7);
-				break;
-			case 2:
-				memcpy(ret, "idiot", 5);
-				break;
-			case 3:
-				memcpy(ret, "idiot", 5);
-				break;
-			default:
-				memcpy(ret, INVALID_REQUEST_MESSAGE, sizeof(INVALID_REQUEST_MESSAGE));
+		case 1:
+			view(cfd);
+			memcpy(ret, "success", 7);
+			break;
+		case 2:
+			memcpy(ret, "idiot", 5);
+			break;
+		case 3:
+			memcpy(ret, "idiot", 5);
+			break;
+		default:
+			memcpy(ret, INVALID_REQUEST_MESSAGE,
+				   sizeof(INVALID_REQUEST_MESSAGE));
 		}
 
-		if ((send(cfd, ret, sizeof(ret), 0)) == -1) {
+		if ((send(cfd, ret, BUFSIZE, 0)) == -1) {
 			perror("send()");
 			exit(9);
 		}

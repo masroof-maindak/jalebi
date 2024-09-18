@@ -1,8 +1,10 @@
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 #include "../include/utils.h"
 
@@ -22,6 +24,81 @@ char *copy_string(const char *str) {
 	memcpy(copy, str, size);
 	copy[size] = '\0';
 	return copy;
+}
+
+int getNumDigits(__off_t n) {
+	int r = 1;
+	for (; n > 9; n /= 10, r++)
+		;
+	return r;
+}
+
+int view(int cfd) {
+	DIR *d;
+	char *buf, *tmp, *path;
+	char fileInfo[512];
+	int idx = 0, fsizeDigits, localSize = BUFSIZE, iter, retEntryLen;
+	struct dirent *entry;
+	struct stat info;
+
+	if ((d = opendir(HOSTDIR)) == NULL) {
+		perror("opendir()");
+		return 1;
+	}
+
+	buf	 = malloc(BUFSIZE);
+	path = malloc(512);
+
+	if (buf == NULL || path == NULL) {
+		perror("malloc()");
+		closedir(d);
+		return 2;
+	}
+
+	while ((entry = readdir(d)) != NULL) {
+
+		if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+			continue;
+
+		sprintf(path, HOSTDIR "/%s", entry->d_name);
+		if ((stat(path, &info)) != 0) {
+			perror("stat()");
+			free(buf);
+			closedir(d);
+			return 3;
+		}
+
+		fsizeDigits = getNumDigits(info.st_size);
+		retEntryLen = entry->d_reclen + 3 + fsizeDigits + 1;
+
+		if (idx + retEntryLen > localSize) {
+			localSize *= 2;
+			if ((tmp = realloc(buf, localSize)) == NULL) {
+				perror("realloc()");
+				free(buf);
+				closedir(d);
+				return 4;
+			}
+		}
+
+		sprintf(fileInfo, "%s - %ld\n", entry->d_name, info.st_size);
+		printf("Writing: %s", fileInfo);
+		memcpy(buf + idx, fileInfo, retEntryLen);
+		idx += retEntryLen;
+	}
+
+	/* TODO: abstract this out to where this is called from */
+	/* NOTE: view should only populate the buffer */
+	for (iter = 0; localSize > 0; iter++, localSize -= BUFSIZE) {
+		if ((send(cfd, buf + (iter << 10), min(BUFSIZE, localSize), 0)) == -1) {
+			perror("send()");
+			closedir(d);
+			return 5;
+		}
+	}
+	free(buf);
+
+	return closedir(d);
 }
 
 /**
