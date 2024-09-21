@@ -26,18 +26,33 @@ char *copy_string(const char *str) {
 	return copy;
 }
 
-int getNumDigits(__off_t n) {
+int get_num_digits(__off_t n) {
 	int r = 1;
 	for (; n > 9; n /= 10, r++)
 		;
 	return r;
 }
 
+char *double_if_of(char *buf, int idx, int addition, int *size) {
+	char *tmp = NULL;
+
+	if (idx + addition > *size) {
+		*size *= 2;
+
+		if ((tmp = realloc(buf, *size)) == NULL) {
+			perror("realloc()");
+			free(buf);
+			return NULL;
+		}
+	}
+
+	return buf;
+}
+
 int view(int cfd) {
 	DIR *d;
-	char *buf, *tmp, *path;
-	char fileInfo[512];
-	int idx = 0, fsizeDigits, localSize = BUFSIZE, iter, retEntryLen;
+	char *buf, *path;
+	int idx = 0, localSize = BUFSIZE, iter, entrySize;
 	struct dirent *entry;
 	struct stat info;
 
@@ -47,7 +62,7 @@ int view(int cfd) {
 	}
 
 	buf	 = malloc(BUFSIZE);
-	path = malloc(512);
+	path = malloc(BUFSIZE >> 1);
 
 	if (buf == NULL || path == NULL) {
 		perror("malloc()");
@@ -68,29 +83,23 @@ int view(int cfd) {
 			return 3;
 		}
 
-		fsizeDigits = getNumDigits(info.st_size);
-		retEntryLen = entry->d_reclen + 3 + fsizeDigits + 1;
-
-		if (idx + retEntryLen > localSize) {
-			localSize *= 2;
-			if ((tmp = realloc(buf, localSize)) == NULL) {
-				perror("realloc()");
-				free(buf);
-				closedir(d);
-				return 4;
-			}
+		entrySize = strlen(entry->d_name) + get_num_digits(info.st_size) + 4;
+		if ((buf = double_if_of(buf, idx, entrySize, &localSize)) == NULL) {
+			closedir(d);
+			return 4;
 		}
 
-		sprintf(fileInfo, "%s - %ld\n", entry->d_name, info.st_size);
-		printf("Writing: %s", fileInfo);
-		memcpy(buf + idx, fileInfo, retEntryLen);
-		idx += retEntryLen;
+		idx += sprintf(buf + idx, "%s - %ld\n", entry->d_name, info.st_size);
 	}
 
-	/* TODO: abstract this out to where this is called from */
-	/* NOTE: view should only populate the buffer */
-	for (iter = 0; localSize > 0; iter++, localSize -= BUFSIZE) {
-		if ((send(cfd, buf + (iter << 10), min(BUFSIZE, localSize), 0)) == -1) {
+	buf[idx] = '\0';
+
+	/*
+	 * TODO: abstract this out to where this is called from
+	 * NOTE: view should only populate buf, the server should return it
+	 */
+	for (iter = 0; idx > 0; iter++, idx -= BUFSIZE) {
+		if ((send(cfd, buf + (iter << 10), min(BUFSIZE, idx), 0)) == -1) {
 			perror("send()");
 			closedir(d);
 			return 5;
@@ -98,6 +107,7 @@ int view(int cfd) {
 	}
 	free(buf);
 
+	free(path);
 	return closedir(d);
 }
 

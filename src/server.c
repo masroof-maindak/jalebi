@@ -24,7 +24,7 @@ int identifyRequest(char *type) {
 int main() {
 	ensure_srv_dir_exists();
 
-	int sfd, cfd, reuse, reqType;
+	int sfd, cfd, reuse, reqType, retSize = 0;
 	ssize_t bytesRead;
 	char *buf;
 	struct sockaddr_in saddr;
@@ -65,6 +65,7 @@ int main() {
 		exit(5);
 	}
 
+	char ret[128];
 	for (;;) {
 		if ((cfd = accept(sfd, (struct sockaddr *)&caddr, &addrSize)) == -1) {
 			free(buf);
@@ -72,9 +73,7 @@ int main() {
 			exit(6);
 		}
 
-		bytesRead = recv(cfd, buf, BUFSIZE, 0);
-
-		if (bytesRead == -1) {
+		if ((bytesRead = recv(cfd, buf, BUFSIZE, 0)) == -1) {
 			free(buf);
 			perror("recv()");
 			exit(7);
@@ -84,32 +83,33 @@ int main() {
 
 		/* TODO - proper request type identification later */
 		/* NOTE - for now, it is assumed the client will only pass 'VIEW' */
-		char *ret = malloc(BUFSIZE);
 
 		reqType = identifyRequest(buf);
 
 		switch (reqType) {
 		case 1:
+			retSize = 8;
 			view(cfd);
-			memcpy(ret, "success", 7);
+			memcpy(ret, "success\n", retSize);
+			ret[retSize] = '\0';
 			break;
 		case 2:
-			memcpy(ret, "idiot", 5);
+			retSize = 6;
+			memcpy(ret, "idiot\n", retSize);
 			break;
 		case 3:
-			memcpy(ret, "idiot", 5);
+			retSize = 6;
+			memcpy(ret, "idiot\n", retSize);
 			break;
 		default:
 			memcpy(ret, INVALID_REQUEST_MESSAGE,
 				   sizeof(INVALID_REQUEST_MESSAGE));
 		}
 
-		if ((send(cfd, ret, BUFSIZE, 0)) == -1) {
+		if ((send(cfd, ret, retSize, 0)) == -1) {
 			perror("send()");
 			exit(9);
 		}
-
-		free(ret);
 	}
 
 	close(sfd);
