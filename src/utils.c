@@ -49,66 +49,47 @@ char *double_if_of(char *buf, int idx, int addition, int *size) {
 	return buf;
 }
 
-int view(int cfd) {
+ssize_t view(char *buf, int size) {
 	DIR *d;
-	char *buf, *path;
-	int idx = 0, localSize = BUFSIZE, iter, entrySize;
-	struct dirent *entry;
-	struct stat info;
+	char path[BUFSIZE >> 1];
+	int idx = 0, entSz, sz;
+	struct dirent *ent;
+	struct stat inf;
 
 	if ((d = opendir(HOSTDIR)) == NULL) {
 		perror("opendir()");
-		return 1;
+		return -1;
 	}
 
-	buf	 = malloc(BUFSIZE);
-	path = malloc(BUFSIZE >> 1);
-
-	if (buf == NULL || path == NULL) {
-		perror("malloc()");
-		closedir(d);
-		return 2;
-	}
-
-	while ((entry = readdir(d)) != NULL) {
-
-		if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+	while ((ent = readdir(d)) != NULL) {
+		if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, ".."))
 			continue;
 
-		sprintf(path, HOSTDIR "/%s", entry->d_name);
-		if ((stat(path, &info)) != 0) {
+		sprintf(path, HOSTDIR "/%s", ent->d_name);
+		if ((stat(path, &inf)) != 0) {
 			perror("stat()");
-			free(buf);
-			closedir(d);
-			return 3;
+			idx = -2;
+			goto cleanup;
 		}
 
-		entrySize = strlen(entry->d_name) + get_num_digits(info.st_size) + 4;
-		if ((buf = double_if_of(buf, idx, entrySize, &localSize)) == NULL) {
-			closedir(d);
-			return 4;
+		entSz = strlen(ent->d_name) + get_num_digits(inf.st_size) + 5;
+		if ((buf = double_if_of(buf, idx, entSz, &size)) == NULL) {
+			idx = -3;
+			goto cleanup;
 		}
 
-		idx += sprintf(buf + idx, "%s - %ld\n", entry->d_name, info.st_size);
+		sz = snprintf(buf + idx, entSz, "%s - %ld\n", ent->d_name, inf.st_size);
+		if (sz < 0) {
+			idx = -4;
+			goto cleanup;
+		}
+		idx += sz;
 	}
 
 	buf[idx] = '\0';
-
-	/*
-	 * TODO: abstract this out to where this is called from
-	 * NOTE: view should only populate buf, the server should return it
-	 */
-	for (iter = 0; idx > 0; iter++, idx -= BUFSIZE) {
-		if ((send(cfd, buf + (iter << 10), min(BUFSIZE, idx), 0)) == -1) {
-			perror("send()");
-			closedir(d);
-			return 5;
-		}
-	}
-	free(buf);
-
-	free(path);
-	return closedir(d);
+cleanup:
+	closedir(d);
+	return idx;
 }
 
 /**
@@ -155,14 +136,4 @@ int download(char *filename, size_t bytes, int sockfd) {
 	}
 
 	return 0;
-}
-
-void ensure_srv_dir_exists() {
-	struct stat st = {0};
-	if (stat(HOSTDIR, &st) == -1) {
-		if (mkdir(HOSTDIR, 0700) == -1) {
-			perror("mkdir()");
-			return;
-		}
-	}
 }

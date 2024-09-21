@@ -3,18 +3,19 @@
 
 #include <sys/types.h>
 
-#define SERVER_PORT				9173
-#define BUFSIZE					1024
-#define HOSTDIR					"srv"
-#define INVALID_REQUEST_MESSAGE "Error: Invalid request!"
+#define SERVER_PORT		 9173
+#define BUFSIZE			 1024
+#define HOSTDIR			 "srv"
+#define FAILURE_MSG		 "$FAILURE$\n"
+#define VIEW_FAILURE_MSG "$FAILURE$NO_CLIENT_DATA$\n"
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
-void ensure_srv_dir_exists();
 char *copy_string(const char *str);
-int download(char *filename, size_t bytes, int sockfd);
+ssize_t view(char *buf, int size);
+
 int upload(char *filename, size_t bytes, int sockfd);
-int view(int cfd);
+int download(char *filename, size_t bytes, int sockfd);
 
 #endif // UTILS_H
