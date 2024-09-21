@@ -128,8 +128,34 @@ int init_server_socket(struct sockaddr_in *saddr) {
 	return sfd;
 }
 
-int wrap_upload(int cfd) { return cfd; }
-int wrap_download(int cfd) { return cfd; }
+int wrap_upload(int cfd) {
+	/*
+	 * This is going to get called if the user opted to DOWNLOAD.
+	 * 1. we must check if the file exists inside HOSTDIR
+	 * 2. If not, send back $FAILURE$FILE_NOT_FOUND$
+	 * 3. Else, query that file for it's size, and send() it back
+	 * 4. recv() acknowledgement
+	 * 5. Call upload function to send() file until nothing remains
+	 */
+
+	return cfd;
+}
+
+int wrap_download(int cfd) {
+	/*
+	 * This is going to get called if the user opted to UPLOAD.
+	 * 1. we must recv() their file's total size.
+	 * 2. we must query the HOSTDIR and check if we have enough space to
+	 * 	  accomdate this new file (HOSTDIR_MAXSIZE > hostdirSize + fsize)
+	 * 3. If not, send back $FAILURE$LOW_SPACE$
+	 * 4. Else, send back $SUCCESS$
+	 * 5. Call the main download function using the `bytes` acquired from #2
+	 * 6. Send $SUCCESS$ again
+	 */
+
+	return cfd;
+}
+
 int wrap_view(int cfd) {
 	int status = 0;
 	ssize_t idx;

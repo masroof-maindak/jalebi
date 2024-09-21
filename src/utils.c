@@ -96,8 +96,10 @@ cleanup:
  * @brief download `bytes` bytes from the socket behind `sockfd`, into
  * `filename` file
  *
- * @details the client must first send the number of bytes that it is going to
- * send in a separate call; that value is passed as the `bytes` parameter
+ * @details the side that is downloading must first recv() the number of bytes
+ * that it is going to send in a separate call; that value is passed as the
+ * `bytes` parameter. Then, the other party must, in similar and simultaneous
+ * fashion, send over the chunks of that file until there are none left
  */
 int download(char *filename, size_t bytes, int sockfd) {
 	FILE *fp;
