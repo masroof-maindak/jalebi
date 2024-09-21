@@ -1,110 +1,109 @@
-#include <stdio.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+
 #include "../include/utils.h"
 
 int main() {
-    int sockfd;
-    struct sockaddr_in servaddr;
-    const char *server_ip = "127.0.0.1"; 
-    int port = SERVER_PORT; 
-    char request[BUFSIZE];
-    char response[BUFSIZE];
-    ssize_t bytes_sent, bytes_received;
+	int sockfd;
+	struct sockaddr_in saddr;
+	const char *serverIp = "127.0.0.1";
+	int port			 = SERVER_PORT;
+	char request[BUFSIZE];
+	char response[BUFSIZE];
+	ssize_t bytesSent, bytesRead;
 
-    printf("Connecting to server at %s:%d...\n",server_ip, port);
+	printf("Connecting to server at %s:%d...\n", serverIp, port);
 
-    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("Socket creation failed");
-        exit(EXIT_FAILURE);
-    }
+	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		perror("socket()");
+		return -1;
+	}
 
-    memset(&servaddr, 0, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(port);
-    
-    if (inet_pton(AF_INET, server_ip, &servaddr.sin_addr) <= 0) {
-        perror("Invalid address or address not supported");
-        exit(EXIT_FAILURE);
-    }
+	memset(&saddr, 0, sizeof(saddr));
+	saddr.sin_family = AF_INET;
+	saddr.sin_port	 = htons(port);
 
-    printf("Attempting to connect to the server...\n");
-    if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
-        perror("Connection to the server failed");
-        close(sockfd);
-        exit(EXIT_FAILURE);
-    }
+	if (inet_pton(AF_INET, serverIp, &saddr.sin_addr) <= 0) {
+		perror("inet_pton()");
+		return -2;
+	}
 
-    printf("Connection to the server successful.\n");
+	if (connect(sockfd, (struct sockaddr *)&saddr, sizeof(saddr)) < 0) {
+		perror("connect()");
+		close(sockfd);
+		return -3;
+	}
 
-    printf("Enter request type: ");
-    scanf("%s", request);
+	printf("Enter request type: ");
+	scanf("%s", request);
 
-    bytes_sent = send(sockfd, request, strlen(request), 0);
-    if (bytes_sent == -1) {
-        perror("Failed to send request");
-        close(sockfd);
-        exit(EXIT_FAILURE);
-    }
+	if ((bytesSent = send(sockfd, request, strlen(request), 0)) == -1) {
+		perror("send()");
+		close(sockfd);
+		return -4;
+	}
 
-    bytes_received = recv(sockfd, response, BUFSIZE, 0);
-    if (bytes_received == -1) {
-        perror("Failed to receive response from server");
-        close(sockfd);
-        exit(EXIT_FAILURE);
-    }
+	if ((bytesRead = recv(sockfd, response, BUFSIZE, 0)) == -1) {
+		perror("recv()");
+		close(sockfd);
+		exit(EXIT_FAILURE);
+	}
 
-    response[bytes_received] = '\0'; 
-    printf("Server response: %s\n", response);
+	response[bytesRead] = '\0';
+	printf("Server response: %s\n", response);
 
-    if (strncmp(request, "UPLOAD$", 7) == 0 && strncmp(response, "$SUCCESS$", 9) == 0) {
-        char *filepath = request + 8;  
-        FILE *file = fopen(filepath, "rb"); 
-        if (file == NULL) {
-            perror("Failed to open file");
-            close(sockfd);
-            exit(EXIT_FAILURE);
-        }
+	if (!strncmp(request, "UPLOAD$", 7) && !strncmp(response, "$SUCCESS$", 9)) {
+		char *filepath = request + 8;
+		FILE *file	   = fopen(filepath, "rb");
 
-        char file_buffer[BUFSIZE];
-        size_t bytes_read;
-        while ((bytes_read = fread(file_buffer, 1, BUFSIZE, file)) > 0) {
-            bytes_sent = send(sockfd, file_buffer, bytes_read, 0);
-            if (bytes_sent == -1) {
-                perror("Failed to send file data");
-                fclose(file);
-                close(sockfd);
-                exit(EXIT_FAILURE);
-            }
-        }
+		if (file == NULL) {
+			perror("fopen()");
+			close(sockfd);
+			exit(EXIT_FAILURE);
+		}
 
-        fclose(file);
-        printf("File upload completed.\n");
-    }
+		char buf[BUFSIZE];
+		size_t bytesRead;
 
-    if (strncmp(request, "DOWNLOAD$", 9) == 0 && strncmp(response, "$SUCCESS$", 9) == 0) {
-        char *filepath = request + 10;  
-        FILE *file = fopen(filepath, "wb");  
-        if (file == NULL) {
-            perror("Failed to open file");
-            close(sockfd);
-            exit(EXIT_FAILURE);
-        }
+		while ((bytesRead = fread(buf, 1, BUFSIZE, file)) > 0) {
+			if (send(sockfd, buf, bytesRead, 0) == -1) {
+				perror("Failed to send file data");
+				fclose(file);
+				close(sockfd);
+				exit(EXIT_FAILURE);
+			}
+		}
 
-        char file_buffer[BUFSIZE];
-        while ((bytes_received = recv(sockfd, file_buffer, BUFSIZE, 0)) > 0) {
-            fwrite(file_buffer, 1, bytes_received, file);
-        }
+		fclose(file);
+		printf("File upload completed.\n");
+	}
 
-        fclose(file);
-        printf("File download completed.\n");
-    }
+	if (!strncmp(request, "DOWNLOAD$", 9) &&
+		!strncmp(response, "$SUCCESS$", 9)) {
 
-    close(sockfd);
+		char *filepath = request + 10;
+		FILE *fp	   = fopen(filepath, "wb");
 
-    return 0;
+		if (fp == NULL) {
+			perror("Failed to open file");
+			close(sockfd);
+			exit(EXIT_FAILURE);
+		}
+
+		char buf[BUFSIZE];
+		while ((bytesRead = recv(sockfd, buf, BUFSIZE, 0)) > 0) {
+			fwrite(buf, 1, bytesRead, fp);
+		}
+
+		fclose(fp);
+		printf("File download completed.\n");
+	}
+
+	close(sockfd);
+	return 0;
 }
