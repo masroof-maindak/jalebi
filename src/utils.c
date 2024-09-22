@@ -1,10 +1,10 @@
-
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-
+#include <sys/types.h>
 
 #include "../include/utils.h"
 
@@ -200,27 +200,4 @@ cleanup:
 	free(buf);
 	fclose(fp);
 	return ret;
-}
-
-char *read_file(const char *filename) {
-	FILE *file = fopen(filename, "rb");
-	if (!file) {
-		perror("Failed to open file");
-		return NULL;
-	}
-	fseek(file, 0, SEEK_END);
-	long filesize = ftell(file);
-	fseek(file, 0, SEEK_SET);
-	char *buffer = malloc(filesize + 1);
-	if (!buffer) {
-		perror("Failed to allocate memory");
-		fclose(file);
-		return NULL;
-	}
-
-	size_t bytesRead  = fread(buffer, 1, filesize, file);
-	buffer[bytesRead] = '\0';
-
-	fclose(file);
-	return buffer;
 }
