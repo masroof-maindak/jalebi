@@ -93,20 +93,17 @@ cleanup:
 }
 
 /**
- * @brief download `bytes` bytes from the socket behind `sockfd`, into
+ * @brief upload `bytes` bytes to the socket behind `sockfd`, from
  * `filename` file
  *
- * @details the side that is downloading must first recv() the number of bytes
- * that it is going to send in a separate call; that value is passed as the
- * `bytes` parameter. Then, the other party must, in similar and simultaneous
- * fashion, send over the chunks of that file until there are none left
+ * @note the file's existence must be guaranteed before calling this function
  */
-int download(char *filename, size_t bytes, int sockfd) {
+int upload(char *filename, size_t bytes, int sockfd) {
 	FILE *fp;
-	int bytesRead, toRead;
+	int bytesRead, toWrite, ret = 0;
 	char *buf;
 
-	if ((fp = fopen(filename, "b")) == NULL) {
+	if ((fp = fopen(filename, "r")) == NULL) {
 		perror("fopen()");
 		return 1;
 	}
@@ -119,23 +116,88 @@ int download(char *filename, size_t bytes, int sockfd) {
 
 	while (bytes > 0) {
 
-		toRead = min(BUFSIZE, bytes);
+		toWrite = min(BUFSIZE, bytes);
 
-		if ((bytesRead = recv(sockfd, buf, toRead, 0)) == -1) {
-			perror("read()");
-			fclose(fp);
-			return 3;
-		}
-
-		if (bytesRead != toRead) {
-			fprintf(stderr, "Didn't read as much as we were expecting...");
+		if ((bytesRead = fread(buf, 1, toWrite, fp)) == -1) {
+			perror("fread()");
 			fclose(fp);
 			return 4;
 		}
 
+		if (bytesRead != toWrite) {
+			fprintf(stderr, "Error: file read mismatch!");
+			ret = 4;
+			goto cleanup;
+		}
+
+		if (send(sockfd, buf, bytesRead, 0) == -1) {
+			perror("send()");
+			ret = 5;
+			goto cleanup;
+		}
+
+		bytes -= bytesRead;
+	}
+
+cleanup:
+	free(buf);
+	fclose(fp);
+	return ret;
+}
+
+/**
+ * @brief download `bytes` bytes from the socket behind `sockfd`, into
+ * `filename` file
+ *
+ * @details the side that is downloading must first recv() the number of bytes
+ * that it is going to send in a separate call; that value is passed as the
+ * `bytes` parameter. Then, the other party must, in similar and simultaneous
+ * fashion, send over the chunks of that file until there are none left
+ */
+int download(char *filename, size_t bytes, int sockfd) {
+	FILE *fp;
+	int bytesRead, toRead, ret = 0;
+	char *buf;
+
+	if ((fp = fopen(filename, "w")) == NULL) {
+		perror("fopen()");
+		return 1;
+	}
+
+	if ((buf = malloc(BUFSIZE)) == NULL) {
+		perror("malloc()");
+		ret = 2;
+		goto cleanup;
+	}
+
+	while (bytes > 0) {
+
+		toRead = min(BUFSIZE, bytes);
+
+		if ((bytesRead = recv(sockfd, buf, toRead, 0)) == -1) {
+			perror("recv()");
+			ret = 3;
+			goto cleanup;
+		}
+
+		if (bytesRead != toRead) {
+			fprintf(stderr, "Error: socket read mismatch!");
+			ret = 4;
+			goto cleanup;
+		}
+
 		fwrite(buf, bytesRead, 1, fp);
+		if (ferror(fp)) {
+			perror("fwrite()");
+			ret = 5;
+			goto cleanup;
+		}
+
 		bytes -= toRead;
 	}
 
-	return 0;
+cleanup:
+	free(buf);
+	fclose(fp);
+	return ret;
 }
