@@ -93,12 +93,11 @@ cleanup:
 }
 
 /**
- * @brief upload `bytes` bytes to the socket behind `sockfd`, from
- * `filename` file
+ * @brief upload `bytes` bytes, from `filename` file, to the client's socket
  *
  * @note the file's existence must be guaranteed before calling this function
  */
-int upload(char *filename, size_t bytes, int sockfd) {
+int serv_upload(char *filename, size_t bytes, int cfd) {
 	FILE *fp;
 	int bytesRead, toWrite, ret = 0;
 	char *buf;
@@ -120,8 +119,8 @@ int upload(char *filename, size_t bytes, int sockfd) {
 
 		if ((bytesRead = fread(buf, 1, toWrite, fp)) == -1) {
 			perror("fread()");
-			fclose(fp);
-			return 4;
+			ret = 3;
+			goto cleanup;
 		}
 
 		if (bytesRead != toWrite) {
@@ -130,7 +129,7 @@ int upload(char *filename, size_t bytes, int sockfd) {
 			goto cleanup;
 		}
 
-		if (send(sockfd, buf, bytesRead, 0) == -1) {
+		if (send(cfd, buf, bytesRead, 0) == -1) {
 			perror("send()");
 			ret = 5;
 			goto cleanup;
@@ -146,15 +145,10 @@ cleanup:
 }
 
 /**
- * @brief download `bytes` bytes from the socket behind `sockfd`, into
+ * @brief download a total of 'bytes' bytes from a client, into
  * `filename` file
- *
- * @details the side that is downloading must first recv() the number of bytes
- * that it is going to send in a separate call; that value is passed as the
- * `bytes` parameter. Then, the other party must, in similar and simultaneous
- * fashion, send over the chunks of that file until there are none left
  */
-int download(char *filename, size_t bytes, int sockfd) {
+int serv_download(char *filename, size_t bytes, int cfd) {
 	FILE *fp;
 	int bytesRead, toRead, ret = 0;
 	char *buf;
@@ -174,7 +168,7 @@ int download(char *filename, size_t bytes, int sockfd) {
 
 		toRead = min(BUFSIZE, bytes);
 
-		if ((bytesRead = recv(sockfd, buf, toRead, 0)) == -1) {
+		if ((bytesRead = recv(cfd, buf, toRead, 0)) == -1) {
 			perror("recv()");
 			ret = 3;
 			goto cleanup;
@@ -200,6 +194,25 @@ cleanup:
 	free(buf);
 	fclose(fp);
 	return ret;
+}
+
+/*
+ * TODO: more robust error checking needed,
+ * NOTE: `telnet` seems to be appending two additional bytes,
+ * one for the carriage return and one for the new line; we must
+ * find out if this is telnet-specific or general to all clients,
+ * and modify our treatment of bytesRead accordingly, because we
+ * need it to validate `buf` later on
+ */
+
+int identify_request(char *buf) {
+	if (!strncmp(buf, "$VIEW$", 6))
+		return 1;
+	else if (!strncmp(buf, "$DOWNLOAD$", 10))
+		return 2;
+	else if (!strncmp(buf, "$UPLOAD$", 8))
+		return 3;
+	return -1;
 }
 
 /* NOTE: see message above `identify_request` */

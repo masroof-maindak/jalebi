@@ -16,10 +16,11 @@
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
 char *copy_string(const char *str);
+int identify_request(char *buf);
 ssize_t view(char *buf, size_t size);
 
 char *double_if_of(char *buf, int idx, int addition, size_t *size);
-int upload(char *filename, size_t bytes, int sockfd);
-int download(char *filename, size_t bytes, int sockfd);
+int serv_upload(char *filename, size_t bytes, int cfd);
+int serv_download(char *filename, size_t bytes, int cfd);
 
 #endif // UTILS_H
