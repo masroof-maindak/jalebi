@@ -202,36 +202,27 @@ cleanup:
 	return ret;
 }
 
+/* NOTE: see message above `identify_request` */
+int validate_download_request(const char *req) {
+	char filename[1024];
+	char path[1024];
+	int prefixLen = strlen("$DOWNLOAD$");
+	struct stat st;
 
+	int filenameLen = strlen(req) - prefixLen;
 
-int validate_download_request(const char *request) {
-    if (strncmp(request, "$DOWNLOAD$", strlen("$DOWNLOAD$")) != 0) {
-        return -1; // Invalid prefix
-    }
+	if (filenameLen <= 0 || filenameLen >= sizeof(filename))
+		return -1;
 
-    char filename[1024];
-    int filename_len = strlen(request) - strlen("$DOWNLOAD$");
-    if (filename_len <= 0 || filename_len >= sizeof(filename)) {
-        return -2; // Invalid filename length
-    }
-    strncpy(filename, request + strlen("$DOWNLOAD$"), filename_len);
-    filename[filename_len] = '\0';
+	strncpy(filename, req + strlen("$DOWNLOAD$"), filenameLen);
+	filename[filenameLen] = '\0';
 
-    if (filename[filename_len - 1] != '$') {
-        return -3; // Missing trailing "$"
-    }
+	if (filename[filenameLen - 1] != '$')
+		return -2;
 
-    if (strchr(filename, ' ') != NULL) {
-        return -4; // Invalid filename (contains spaces)
-    }
+	snprintf(path, sizeof(path), HOSTDIR "/%s", filename);
+	if (stat(path, &st) != 0)
+		return -3;
 
-    char full_path[1024];
-    snprintf(full_path, sizeof(full_path), "%s/%s", HOSTDIR, filename);
-    struct stat st;
-    if (stat(full_path, &st) != 0) {
-        return -5; // File not found
-    }
-
-    // File is valid
-    return 0;
+	return 0;
 }
