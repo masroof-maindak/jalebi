@@ -1,11 +1,13 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
 #include "../include/utils.h"
+#include "../include/encode.h"
 
 int main() {
 	int sockfd;
@@ -57,10 +59,48 @@ int main() {
 
 	if (!strncmp(request, "UPLOAD$", 7) && !strncmp(response, "$SUCCESS$", 9)) {
 		char *filepath = request + 8;
-		if (serv_upload(filepath, sockfd, 0) != 0) {
-			printf("File upload failed.\n");
-		} else {
-			printf("File upload completed.\n");
+		FILE *file	   = fopen(filepath, "rb");
+		if (file == NULL) {
+			perror("fopen()");
+			close(sockfd);
+			return -6;
+		}
+
+		char buffer[BUFSIZE];
+		ssize_t bytesRead;
+		char *encoded		 = NULL;
+		size_t bytesToUpload = 0;
+
+		fseek(file, 0, SEEK_END);
+		bytesToUpload = ftell(file);
+		fseek(file, 0, SEEK_SET);
+
+		if (send(sockfd, &bytesToUpload, sizeof(bytesToUpload), 0) == -1) {
+			perror("Failed to send upload size");
+			close(sockfd);
+			fclose(file);
+			return -7;
+		}
+
+		while ((bytesRead = fread(buffer, 1, BUFSIZE, file)) > 0) {
+			buffer[bytesRead] = '\0';
+			encoded = run_length_encode(buffer);
+			if (encoded == NULL) {
+				perror("run_length_encode()");
+				close(sockfd);
+				fclose(file);
+				return -8;
+			}
+
+			if (serv_upload(filepath, bytesToUpload, sockfd) != 0) {
+				printf("File upload failed.\n");
+				close(sockfd);
+				fclose(file);
+				free(encoded);
+				return -9;
+			}
+
+			free(encoded);
 		}
 	}
 
