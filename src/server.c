@@ -11,13 +11,6 @@
 #include "../include/server.h"
 #include "../include/utils.h"
 
-int init_server_socket(struct sockaddr_in *saddr);
-void ensure_srv_dir_exists();
-
-int serv_wrap_view(int cfd);
-int serv_wrap_upload(int cfd);
-int serv_wrap_download(int cfd, char *buf);
-
 int main() {
 	ensure_srv_dir_exists();
 	int sfd, cfd, reqType, status, ret = 0;
@@ -57,11 +50,11 @@ int main() {
 		switch (reqType) {
 		case 1: /* $VIEW$ */
 			status = serv_wrap_view(cfd);
-			break; /* $DOWNLOAD$<filename>$ */
-		case 2:
-			status = serv_wrap_upload(cfd);
 			break;
-		case 3: /* $UPLOAD$<filepath>$ */
+		case 2: /* $DOWNLOAD$<filename>$ */
+			status = serv_wrap_upload(cfd, buf);
+			break;
+		case 3: /* $UPLOAD$<filename>$ */
 			status = serv_wrap_download(cfd, buf);
 			break;
 		default:
@@ -123,17 +116,50 @@ int init_server_socket(struct sockaddr_in *saddr) {
 	return sfd;
 }
 
-int serv_wrap_upload(int cfd) {
-	/*
-	 * This is going to get called if the user opted to DOWNLOAD.
-	 * 1. we must check if the file exists inside HOSTDIR
-	 * 2. If not, send back $FAILURE$FILE_NOT_FOUND$
-	 * 3. Else, query that file for it's size, and send() it back
-	 * 4. recv() acknowledgement
-	 * 5. Call upload function to send() file until nothing remains
-	 */
+/**
+ * @details This function is called when the user opts to DOWNLOAD a file.
+ * 	- we must check if the file exists inside HOSTDIR
+ * 	- If not, send back $FAILURE$FILE_NOT_FOUND$
+ * 	- Else, query that file for it's size, and send() it back
+ * 	- Call serv_upload function to send() file until nothing remains
+ *
+ * @param[buf] the buffer containing the request $DOWNLOAD$<filename>$
+ */
+int serv_wrap_upload(int cfd, char *buf) {
 
-	return cfd;
+	int fsize;
+	char *filename, path[BUFSIZE >> 1], fsizeResp[128];
+	struct stat st;
+
+	filename = buf + 9;
+
+	/* TODO: verify_upload_input */
+
+	snprintf(path, sizeof(path), HOSTDIR "/%s", filename);
+
+	/* file not found */
+	if (stat(path, &st) != 0) {
+		if (send(cfd, DLOAD_FAILURE_MSG, sizeof(DLOAD_FAILURE_MSG), 0) == -1) {
+			perror("send()");
+			return -3;
+		}
+		return -2;
+	}
+
+	/* send fsize */
+	fsize = st.st_size;
+	if (send(cfd, &fsize, sizeof(int), 0) == -1) {
+		perror("send()");
+		return -4;
+	}
+
+	/* upload file */
+	if (serv_upload(filename, fsize, cfd) < 0) {
+		perror("upload()");
+		return -5;
+	}
+
+	return 0;
 }
 
 /**
@@ -152,29 +178,37 @@ int serv_wrap_download(int cfd, char *buf) {
 	int fsize;
 	char *filename;
 
-	/* TODO: error handling + verify '$' at end, else error out */
 	filename = buf + 10;
+
+	/* TODO: validate_download_input */
+	/* if (validate_download_input(buf) != 0) { */
+	/* 	if (send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0) == -1) { */
+	/* 		perror("send()"); */
+	/* 		return -1; */
+	/* 	} */
+	/* 	return -2; */
+	/* } */
 
 	if (recv(cfd, &fsize, sizeof(int), 0) == -1) {
 		perror("recv()");
-		return -1;
+		return -2;
 	}
 
 	/* TODO: check available space here and error out if none */
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send()");
-		return -2;
+		return -3;
 	}
 
 	if (serv_download(filename, fsize, cfd) != 0) {
 		perror("download()");
-		return -3;
+		return -4;
 	}
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send()");
-		return -4;
+		return -5;
 	}
 
 	return 0;

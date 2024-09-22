@@ -119,8 +119,8 @@ int serv_upload(char *filename, size_t bytes, int cfd) {
 
 		if ((bytesRead = fread(buf, 1, toWrite, fp)) == -1) {
 			perror("fread()");
-			fclose(fp);
-			return 4;
+			ret = 3;
+			goto cleanup;
 		}
 
 		if (bytesRead != toWrite) {
