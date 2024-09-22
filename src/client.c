@@ -1,7 +1,6 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -58,7 +57,7 @@ int main() {
 
 	if (!strncmp(request, "UPLOAD$", 7) && !strncmp(response, "$SUCCESS$", 9)) {
 		char *filepath = request + 8;
-		if (upload(filepath, sockfd) != 0) {
+		if (serv_upload(filepath, sockfd, 0) != 0) {
 			printf("File upload failed.\n");
 		} else {
 			printf("File upload completed.\n");
@@ -78,7 +77,7 @@ int main() {
 			return -1;
 		}
 
-		if (download(filepath, bytes_to_download, sockfd) != 0) {
+		if (serv_download(filepath, bytes_to_download, sockfd) != 0) {
 			printf("File download failed.\n");
 		} else {
 			printf("File download completed.\n");

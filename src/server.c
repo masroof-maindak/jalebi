@@ -37,8 +37,6 @@ int main() {
 		return 2;
 	}
 
-	char retArr[128];
-
 	for (;;) {
 		reqType = -1;
 		status	= 0;
@@ -57,18 +55,17 @@ int main() {
 
 		reqType = identify_request(buf);
 		switch (reqType) {
-		case 1:
+		case 1: /* $VIEW$ */
 			status = serv_wrap_view(cfd);
-			break;
+			break; /* $DOWNLOAD$<filename>$ */
 		case 2:
-			status = serv_wrap_download(cfd, buf);
-			break;
-		case 3:
 			status = serv_wrap_upload(cfd);
 			break;
+		case 3: /* $UPLOAD$<filepath>$ */
+			status = serv_wrap_download(cfd, buf);
+			break;
 		default:
-			memcpy(retArr, FAILURE_MSG, sizeof(FAILURE_MSG));
-			if ((send(cfd, retArr, sizeof(FAILURE_MSG), 0)) == -1) {
+			if ((send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1) {
 				perror("send()");
 				ret = 3;
 				goto cleanup;
@@ -195,14 +192,14 @@ int serv_wrap_view(int cfd) {
 
 	/* error while viewing */
 	if ((idx = view(ret, BUFSIZE)) < 0) {
+		fputs("Internal error occured while `view`ing!\n", stderr);
 		status = -2;
 		goto cleanup;
 	}
 
 	/* no files */
 	if (idx == 0) {
-		memcpy(ret, VIEW_FAILURE_MSG, sizeof(VIEW_FAILURE_MSG));
-		if ((send(cfd, ret, sizeof(VIEW_FAILURE_MSG), 0)) == -1) {
+		if ((send(cfd, VIEW_FAILURE_MSG, sizeof(VIEW_FAILURE_MSG), 0)) == -1) {
 			perror("send()");
 			status = -3;
 		}
