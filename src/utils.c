@@ -145,7 +145,7 @@ cleanup:
 }
 
 /**
- * @brief download a total of 'bytes' bytes, from
+ * @brief download a total of 'bytes' bytes from a client, into
  * `filename` file
  */
 int serv_download(char *filename, size_t bytes, int cfd) {

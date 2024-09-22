@@ -14,10 +14,9 @@
 int init_server_socket(struct sockaddr_in *saddr);
 void ensure_srv_dir_exists();
 
-int wrap_view(int cfd);
-/* TODO: Upload/Download interface */
-int wrap_download(int cfd, char *buf);
-int wrap_upload(int cfd);
+int serv_wrap_view(int cfd);
+int serv_wrap_upload(int cfd);
+int serv_wrap_download(int cfd, char *buf);
 
 int main() {
 	ensure_srv_dir_exists();
@@ -59,13 +58,13 @@ int main() {
 		reqType = identify_request(buf);
 		switch (reqType) {
 		case 1:
-			status = wrap_view(cfd);
+			status = serv_wrap_view(cfd);
 			break;
 		case 2:
-			status = wrap_download(cfd, buf);
+			status = serv_wrap_download(cfd, buf);
 			break;
 		case 3:
-			status = wrap_upload(cfd);
+			status = serv_wrap_upload(cfd);
 			break;
 		default:
 			memcpy(retArr, FAILURE_MSG, sizeof(FAILURE_MSG));
@@ -127,7 +126,7 @@ int init_server_socket(struct sockaddr_in *saddr) {
 	return sfd;
 }
 
-int wrap_upload(int cfd) {
+int serv_wrap_upload(int cfd) {
 	/*
 	 * This is going to get called if the user opted to DOWNLOAD.
 	 * 1. we must check if the file exists inside HOSTDIR
@@ -152,7 +151,7 @@ int wrap_upload(int cfd) {
  *
  * @param[buf] the buffer containing the request $UPLOAD$<filename>$
  */
-int wrap_download(int cfd, char *buf) {
+int serv_wrap_download(int cfd, char *buf) {
 	int fsize;
 	char *filename;
 
@@ -184,7 +183,7 @@ int wrap_download(int cfd, char *buf) {
 	return 0;
 }
 
-int wrap_view(int cfd) {
+int serv_wrap_view(int cfd) {
 	int status = 0;
 	ssize_t idx;
 	char *ret;
