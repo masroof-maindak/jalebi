@@ -17,7 +17,7 @@ void ensure_srv_dir_exists();
 
 int wrap_view(int cfd);
 /* TODO: Upload/Download interface */
-int wrap_download(int cfd);
+int wrap_download(int cfd, char *buf);
 int wrap_upload(int cfd);
 
 int main() {
@@ -63,7 +63,7 @@ int main() {
 			status = wrap_view(cfd);
 			break;
 		case 2:
-			status = wrap_download(cfd);
+			status = wrap_download(cfd, buf);
 			break;
 		case 3:
 			status = wrap_upload(cfd);
@@ -141,7 +141,10 @@ int wrap_upload(int cfd) {
 	return cfd;
 }
 
-int wrap_download(int cfd) {
+/**
+ * @param[buf] the buffer containing the request $UPLOAD$<filename>$
+ */
+int wrap_download(int cfd, char* buf) {
 	/*
 	 * This is going to get called if the user opted to UPLOAD.
 	 * 1. we must recv() their file's total size.
@@ -152,8 +155,35 @@ int wrap_download(int cfd) {
 	 * 5. Call the main download function using the `bytes` acquired from #2
 	 * 6. Send $SUCCESS$ again
 	 */
+	
+	int fsize;
 
-	return cfd;
+	/* TODO: Better error handling */
+	char *filename = buf + 10;
+
+	if (recv(cfd, &fsize, sizeof(int), 0) == -1) {
+		perror("recv()");
+		return -1;
+	}
+
+	/* TODO: check available space here and error out if none */
+
+	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
+		perror("send()");
+		return -2;
+	}
+
+	if (download(filename, fsize, cfd) != 0) {
+		perror("download()");
+		return -3;
+	}
+
+	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
+		perror("send()");
+		return -4;
+	}
+
+	return 0;
 }
 
 int wrap_view(int cfd) {
