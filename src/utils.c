@@ -49,81 +49,61 @@ char *double_if_of(char *buf, int idx, int addition, int *size) {
 	return buf;
 }
 
-int view(int cfd) {
+ssize_t view(char *buf, int size) {
 	DIR *d;
-	char *buf, *path;
-	int idx = 0, localSize = BUFSIZE, iter, entrySize;
-	struct dirent *entry;
-	struct stat info;
+	char path[BUFSIZE >> 1];
+	int idx = 0, entSz, sz;
+	struct dirent *ent;
+	struct stat inf;
 
 	if ((d = opendir(HOSTDIR)) == NULL) {
 		perror("opendir()");
-		return 1;
+		return -1;
 	}
 
-	buf	 = malloc(BUFSIZE);
-	path = malloc(BUFSIZE >> 1);
-
-	if (buf == NULL || path == NULL) {
-		perror("malloc()");
-		closedir(d);
-		return 2;
-	}
-
-	while ((entry = readdir(d)) != NULL) {
-
-		if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+	while ((ent = readdir(d)) != NULL) {
+		if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, ".."))
 			continue;
 
-		sprintf(path, HOSTDIR "/%s", entry->d_name);
-		if ((stat(path, &info)) != 0) {
+		sprintf(path, HOSTDIR "/%s", ent->d_name);
+		if ((stat(path, &inf)) != 0) {
 			perror("stat()");
-			free(buf);
-			closedir(d);
-			return 3;
+			idx = -2;
+			goto cleanup;
 		}
 
-		entrySize = strlen(entry->d_name) + get_num_digits(info.st_size) + 4;
-		if ((buf = double_if_of(buf, idx, entrySize, &localSize)) == NULL) {
-			closedir(d);
-			return 4;
+		entSz = strlen(ent->d_name) + get_num_digits(inf.st_size) + 5;
+		if ((buf = double_if_of(buf, idx, entSz, &size)) == NULL) {
+			idx = -3;
+			goto cleanup;
 		}
 
-		idx += sprintf(buf + idx, "%s - %ld\n", entry->d_name, info.st_size);
+		sz = snprintf(buf + idx, entSz, "%s - %ld\n", ent->d_name, inf.st_size);
+		if (sz < 0) {
+			idx = -4;
+			goto cleanup;
+		}
+		idx += sz;
 	}
 
 	buf[idx] = '\0';
-
-	/*
-	 * TODO: abstract this out to where this is called from
-	 * NOTE: view should only populate buf, the server should return it
-	 */
-	for (iter = 0; idx > 0; iter++, idx -= BUFSIZE) {
-		if ((send(cfd, buf + (iter << 10), min(BUFSIZE, idx), 0)) == -1) {
-			perror("send()");
-			closedir(d);
-			return 5;
-		}
-	}
-	free(buf);
-
-	free(path);
-	return closedir(d);
+cleanup:
+	closedir(d);
+	return idx;
 }
 
 /**
- * @brief download `bytes` bytes from the socket behind `sockfd`, into
+ * @brief upload `bytes` bytes to the socket behind `sockfd`, from
  * `filename` file
  *
- * @details the client must first send the number of bytes that it is going to
- * send in a separate call; that value is passed as the `bytes` parameter
+ * @note the file's existence must be guaranteed before calling this function
  */
-int download(char *filename, size_t bytes, int sockfd) {
+int upload(char *filename, size_t bytes, int sockfd) {
 	FILE *fp;
-	int bytesRead, toRead;
+	int bytesRead, toWrite, ret = 0;
 	char *buf;
 
-	if ((fp = fopen(filename, "b")) == NULL) {
+	if ((fp = fopen(filename, "r")) == NULL) {
 		perror("fopen()");
 		return 1;
 	}
@@ -136,35 +116,90 @@ int download(char *filename, size_t bytes, int sockfd) {
 
 	while (bytes > 0) {
 
-		toRead = min(BUFSIZE, bytes);
+		toWrite = min(BUFSIZE, bytes);
 
-		if ((bytesRead = recv(sockfd, buf, toRead, 0)) == -1) {
-			perror("read()");
-			fclose(fp);
-			return 3;
-		}
-
-		if (bytesRead != toRead) {
-			fprintf(stderr, "Didn't read as much as we were expecting...");
+		if ((bytesRead = fread(buf, 1, toWrite, fp)) == -1) {
+			perror("fread()");
 			fclose(fp);
 			return 4;
 		}
 
+		if (bytesRead != toWrite) {
+			fprintf(stderr, "Error: file read mismatch!");
+			ret = 4;
+			goto cleanup;
+		}
+
+		if (send(sockfd, buf, bytesRead, 0) == -1) {
+			perror("send()");
+			ret = 5;
+			goto cleanup;
+		}
+
+		bytes -= bytesRead;
+	}
+
+cleanup:
+	free(buf);
+	fclose(fp);
+	return ret;
+}
+
+/**
+ * @brief download `bytes` bytes from the socket behind `sockfd`, into
+ * `filename` file
+ *
+ * @details the side that is downloading must first recv() the number of bytes
+ * that it is going to send in a separate call; that value is passed as the
+ * `bytes` parameter. Then, the other party must, in similar and simultaneous
+ * fashion, send over the chunks of that file until there are none left
+ */
+int download(char *filename, size_t bytes, int sockfd) {
+	FILE *fp;
+	int bytesRead, toRead, ret = 0;
+	char *buf;
+
+	if ((fp = fopen(filename, "w")) == NULL) {
+		perror("fopen()");
+		return 1;
+	}
+
+	if ((buf = malloc(BUFSIZE)) == NULL) {
+		perror("malloc()");
+		ret = 2;
+		goto cleanup;
+	}
+
+	while (bytes > 0) {
+
+		toRead = min(BUFSIZE, bytes);
+
+		if ((bytesRead = recv(sockfd, buf, toRead, 0)) == -1) {
+			perror("recv()");
+			ret = 3;
+			goto cleanup;
+		}
+
+		if (bytesRead != toRead) {
+			fprintf(stderr, "Error: socket read mismatch!");
+			ret = 4;
+			goto cleanup;
+		}
+
 		fwrite(buf, bytesRead, 1, fp);
+		if (ferror(fp)) {
+			perror("fwrite()");
+			ret = 5;
+			goto cleanup;
+		}
+
 		bytes -= toRead;
 	}
 
-	return 0;
-}
-
-void ensure_srv_dir_exists() {
-	struct stat st = {0};
-	if (stat(HOSTDIR, &st) == -1) {
-		if (mkdir(HOSTDIR, 0700) == -1) {
-			perror("mkdir()");
-			return;
-		}
-	}
+cleanup:
+	free(buf);
+	fclose(fp);
+	return ret;
 }
 
 char *read_file(const char *filename) {
