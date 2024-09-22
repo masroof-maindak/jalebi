@@ -1,5 +1,6 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,76 +12,93 @@
 #include "../include/server.h"
 #include "../include/utils.h"
 
-int main() {
-	ensure_srv_dir_exists();
-	int sfd, cfd, reqType, status, ret = 0;
+void *handle_client(void *arg) {
+	int cfd, reqType, status;
 	ssize_t bytesRead;
 	char *buf;
-	struct sockaddr_in saddr;
-	struct sockaddr_storage caddr;
+
+	if ((buf = malloc(BUFSIZE)) == NULL) {
+		perror("malloc()");
+		pthread_exit(NULL);
+	}
+
+	cfd	   = *(int *)arg;
+	status = 0;
+
+	if ((bytesRead = recv(cfd, buf, BUFSIZE, 0)) == -1) {
+		perror("recv()");
+		goto cleanup;
+	}
+
+	reqType = identify_request(buf);
+
+	switch (reqType) {
+	case 1: /* $VIEW$ */
+		status = serv_wrap_view(cfd);
+		break;
+	case 2: /* $DOWNLOAD$<filename>$ */
+		status = serv_wrap_upload(cfd, buf);
+		break;
+	case 3: /* $UPLOAD$<filename>$ */
+		status = serv_wrap_download(cfd, buf);
+		break;
+	default:
+		if ((send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1) {
+			perror("send()");
+			goto cleanup;
+		}
+	}
+
+	if (status != 0)
+		fprintf(stderr, "Internal error occured in threaded operation!\n");
+
+cleanup:
+	free(buf);
+	if ((close(cfd)) == -1)
+		perror("close(cfd)");
+	pthread_exit(NULL);
+}
+
+int main() {
+	ensure_srv_dir_exists();
+
+	int sfd, cfd, ret = 0;
+	struct sockaddr_in saddr, caddr;
 	socklen_t addrSize = sizeof(caddr);
+	pthread_t clientThread;
 
 	printf("Listening on port %d...\n", SERVER_PORT);
 
 	if ((sfd = init_server_socket(&saddr)) < 0)
 		return 1;
 
-	if ((buf = malloc(BUFSIZE)) == NULL) {
-		perror("malloc()");
-		return 2;
-	}
-
 	for (;;) {
-		reqType = -1;
-		status	= 0;
 
 		if ((cfd = accept(sfd, (struct sockaddr *)&caddr, &addrSize)) == -1) {
 			perror("accept()");
+			ret = 2;
+			goto cleanup;
+		}
+
+		if (pthread_create(&clientThread, NULL, handle_client, &cfd) != 0) {
+			perror("pthread_create()");
 			ret = 3;
 			goto cleanup;
 		}
 
-		if ((bytesRead = recv(cfd, buf, BUFSIZE, 0)) == -1) {
-			perror("recv()");
+		if (pthread_detach(clientThread) != 0) {
+			perror("pthread_detach()");
 			ret = 4;
 			goto cleanup;
 		}
-
-		reqType = identify_request(buf);
-		switch (reqType) {
-		case 1: /* $VIEW$ */
-			status = serv_wrap_view(cfd);
-			break;
-		case 2: /* $DOWNLOAD$<filename>$ */
-			status = serv_wrap_upload(cfd, buf);
-			break;
-		case 3: /* $UPLOAD$<filename>$ */
-			status = serv_wrap_download(cfd, buf);
-			break;
-		default:
-			if ((send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1) {
-				perror("send()");
-				ret = 3;
-				goto cleanup;
-			}
-		}
-
-		if ((close(cfd)) == -1) {
-			perror("close(cfd)");
-			ret = 4;
-			goto cleanup;
-		}
-
-		if (status != 0)
-			break;
 	}
 
 cleanup:
-	free(buf);
 	if ((close(sfd)) == -1) {
 		perror("close(sfd)");
 		ret = 5;
 	}
+
 	return ret;
 }
 
@@ -126,9 +144,8 @@ int init_server_socket(struct sockaddr_in *saddr) {
  * @param[buf] the buffer containing the request $DOWNLOAD$<filename>$
  */
 int serv_wrap_upload(int cfd, char *buf) {
-
 	int fsize;
-	char *filename, path[BUFSIZE >> 1], fsizeResp[128];
+	char *filename, path[BUFSIZE >> 1];
 	struct stat st;
 
 	filename = buf + 9;
@@ -191,24 +208,24 @@ int serv_wrap_download(int cfd, char *buf) {
 
 	if (recv(cfd, &fsize, sizeof(int), 0) == -1) {
 		perror("recv()");
-		return -2;
+		return -3;
 	}
 
 	/* TODO: check available space here and error out if none */
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send()");
-		return -3;
+		return -4;
 	}
 
 	if (serv_download(filename, fsize, cfd) != 0) {
 		perror("download()");
-		return -4;
+		return -5;
 	}
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send()");
-		return -5;
+		return -6;
 	}
 
 	return 0;
@@ -226,7 +243,7 @@ int serv_wrap_view(int cfd) {
 
 	/* error while viewing */
 	if ((idx = view(ret, BUFSIZE)) < 0) {
-		fputs("Internal error occured while `view`ing!\n", stderr);
+		fprintf(stderr, "Internal error occured while `view`ing!\n");
 		status = -2;
 		goto cleanup;
 	}

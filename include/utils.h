@@ -19,7 +19,7 @@ char *copy_string(const char *str);
 int identify_request(char *buf);
 ssize_t view(char *buf, size_t size);
 
-char *double_if_of(char *buf, int idx, int addition, size_t *size);
+char *double_if_of(char *buf, size_t idx, size_t addition, size_t *size);
 int serv_upload(char *filename, size_t bytes, int cfd);
 int serv_download(char *filename, size_t bytes, int cfd);
 
