@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <stdint.h>
 
 #include "../include/utils.h"
 
