@@ -201,3 +201,37 @@ cleanup:
 	fclose(fp);
 	return ret;
 }
+
+
+
+int validate_download_request(const char *request) {
+    if (strncmp(request, "$DOWNLOAD$", strlen("$DOWNLOAD$")) != 0) {
+        return -1; // Invalid prefix
+    }
+
+    char filename[1024];
+    int filename_len = strlen(request) - strlen("$DOWNLOAD$");
+    if (filename_len <= 0 || filename_len >= sizeof(filename)) {
+        return -2; // Invalid filename length
+    }
+    strncpy(filename, request + strlen("$DOWNLOAD$"), filename_len);
+    filename[filename_len] = '\0';
+
+    if (filename[filename_len - 1] != '$') {
+        return -3; // Missing trailing "$"
+    }
+
+    if (strchr(filename, ' ') != NULL) {
+        return -4; // Invalid filename (contains spaces)
+    }
+
+    char full_path[1024];
+    snprintf(full_path, sizeof(full_path), "%s/%s", HOSTDIR, filename);
+    struct stat st;
+    if (stat(full_path, &st) != 0) {
+        return -5; // File not found
+    }
+
+    // File is valid
+    return 0;
+}
