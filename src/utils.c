@@ -4,7 +4,6 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 
 #include "../include/utils.h"
 
@@ -26,7 +25,7 @@ char *copy_string(const char *str) {
 	return copy;
 }
 
-int get_num_digits(__off_t n) {
+uint32_t get_num_digits(__off_t n) {
 	int r = 1;
 	for (; n > 9; n /= 10, r++)
 		;
