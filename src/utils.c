@@ -33,7 +33,7 @@ int get_num_digits(__off_t n) {
 	return r;
 }
 
-char *double_if_of(char *buf, int idx, int addition, int *size) {
+char *double_if_of(char *buf, int idx, int addition, size_t *size) {
 	char *tmp = NULL;
 
 	if (idx + addition > *size) {
@@ -49,7 +49,7 @@ char *double_if_of(char *buf, int idx, int addition, int *size) {
 	return buf;
 }
 
-ssize_t view(char *buf, int size) {
+ssize_t view(char *buf, size_t size) {
 	DIR *d;
 	char path[BUFSIZE >> 1];
 	int idx = 0, entSz, sz;
