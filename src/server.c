@@ -12,7 +12,6 @@
 #include "../include/utils.h"
 
 int init_server_socket(struct sockaddr_in *saddr);
-int identify_request(char *buf);
 void ensure_srv_dir_exists();
 
 int wrap_view(int cfd);
@@ -142,24 +141,23 @@ int wrap_upload(int cfd) {
 }
 
 /**
+ * @details This function is called when the user opts to UPLOAD a file.
+ * 	- Receiving the file's total size from the client
+ * 	- Checking if there is enough space in the HOSTDIR to accomodate this file
+ * 	- If not, sending back $FAILURE$LOW_SPACE$
+ * 	- If yes, sending back $SUCCESS$
+ * 	- Calling the main download function (serv_download) using the `bytes`
+ * 	  acquired from #2
+ * 	- Sending $SUCCESS$ again
+ *
  * @param[buf] the buffer containing the request $UPLOAD$<filename>$
  */
-int wrap_download(int cfd, char* buf) {
-	/*
-	 * This is going to get called if the user opted to UPLOAD.
-	 * 1. we must recv() their file's total size.
-	 * 2. we must query the HOSTDIR and check if we have enough space to
-	 * 	  accomdate this new file (HOSTDIR_MAXSIZE > hostdirSize + fsize)
-	 * 3. If not, send back $FAILURE$LOW_SPACE$
-	 * 4. Else, send back $SUCCESS$
-	 * 5. Call the main download function using the `bytes` acquired from #2
-	 * 6. Send $SUCCESS$ again
-	 */
-	
+int wrap_download(int cfd, char *buf) {
 	int fsize;
+	char *filename;
 
-	/* TODO: Better error handling */
-	char *filename = buf + 10;
+	/* TODO: error handling + verify '$' at end, else error out */
+	filename = buf + 10;
 
 	if (recv(cfd, &fsize, sizeof(int), 0) == -1) {
 		perror("recv()");
@@ -173,7 +171,7 @@ int wrap_download(int cfd, char* buf) {
 		return -2;
 	}
 
-	if (download(filename, fsize, cfd) != 0) {
+	if (serv_download(filename, fsize, cfd) != 0) {
 		perror("download()");
 		return -3;
 	}
@@ -234,23 +232,4 @@ void ensure_srv_dir_exists() {
 			return;
 		}
 	}
-}
-
-/*
- * TODO: more robust error checking needed,
- * NOTE: `telnet` seems to be appending two additional bytes,
- * one for the carriage return and one for the new line; we must
- * find out if this is telnet-specific or general to all clients,
- * and modify our treatment of bytesRead accordingly, because we
- * need it to validate `buf` later on
- */
-
-int identify_request(char *buf) {
-	if (!strncmp(buf, "$VIEW$", 6))
-		return 1;
-	else if (!strncmp(buf, "$DOWNLOAD$", 10))
-		return 2;
-	else if (!strncmp(buf, "$UPLOAD$", 8))
-		return 3;
-	return -1;
 }

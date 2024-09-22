@@ -1,9 +1,8 @@
-#include "../include/encode.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-char *rle(char *inp) { return inp; }
+#include "../include/encode.h"
 
 char *run_length_encode(const char *str) {
 	char current, prev;
