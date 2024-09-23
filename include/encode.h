@@ -1,7 +1,9 @@
-#ifndef UTILS_H
-#define UTILS_H
+#ifndef ENCODE_H
+#define ENCODE_H
 
-char* run_length_encode(const char *str);
-char* run_length_decode(char *encoded_string);
+#include <sys/types.h>
 
-#endif // UTILS_H
+void run_length_encode(const char *str, char *result, size_t initial_size);
+void run_length_decode(char *encoded_string, char *result, size_t initial_size) ;
+
+#endif // ENCODE_H

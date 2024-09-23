@@ -4,7 +4,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <sys/types.h>
+#include <stdint.h>
 
 #include "../include/utils.h"
 
@@ -26,14 +26,14 @@ char *copy_string(const char *str) {
 	return copy;
 }
 
-int get_num_digits(__off_t n) {
+uint32_t get_num_digits(__off_t n) {
 	int r = 1;
 	for (; n > 9; n /= 10, r++)
 		;
 	return r;
 }
 
-char *double_if_of(char *buf, int idx, int addition, int *size) {
+char *double_if_of(char *buf, size_t idx, size_t addition, size_t *size) {
 	char *tmp = NULL;
 
 	if (idx + addition > *size) {
@@ -49,10 +49,11 @@ char *double_if_of(char *buf, int idx, int addition, int *size) {
 	return buf;
 }
 
-ssize_t view(char *buf, int size) {
+ssize_t view(char *buf, size_t size) {
 	DIR *d;
+	size_t idx = 0, entSz;
 	char path[BUFSIZE >> 1];
-	int idx = 0, entSz, sz;
+	int sz;
 	struct dirent *ent;
 	struct stat inf;
 
@@ -119,8 +120,8 @@ int serv_upload(char *filename, size_t bytes, int cfd) {
 
 		if ((bytesRead = fread(buf, 1, toWrite, fp)) == -1) {
 			perror("fread()");
-			fclose(fp);
-			return 4;
+			ret = 3;
+			goto cleanup;
 		}
 
 		if (bytesRead != toWrite) {
@@ -213,4 +214,29 @@ int identify_request(char *buf) {
 	else if (!strncmp(buf, "$UPLOAD$", 8))
 		return 3;
 	return -1;
+}
+
+/* NOTE: see message above `identify_request` */
+int validate_download_request(const char *req) {
+	char filename[1024];
+	char path[1024];
+	int prefixLen = strlen("$DOWNLOAD$");
+	struct stat st;
+
+	int filenameLen = strlen(req) - prefixLen;
+
+	if (filenameLen <= 0 || filenameLen >= sizeof(filename))
+		return -1;
+
+	strncpy(filename, req + strlen("$DOWNLOAD$"), filenameLen);
+	filename[filenameLen] = '\0';
+
+	if (filename[filenameLen - 1] != '$')
+		return -2;
+
+	snprintf(path, sizeof(path), HOSTDIR "/%s", filename);
+	if (stat(path, &st) != 0)
+		return -3;
+
+	return 0;
 }
