@@ -218,14 +218,14 @@ int identify_request(char *buf) {
 
 /* NOTE: see message above `identify_request` */
 int validate_download_request(const char *req) {
-	char filename[1024];
-	char path[1024];
+	char filename[BUFSIZE >> 1];
+	char path[BUFSIZE];
 	int prefixLen = strlen("$DOWNLOAD$");
 	struct stat st;
 
 	int filenameLen = strlen(req) - prefixLen;
 
-	if (filenameLen <= 0 || filenameLen >= sizeof(filename))
+	if (filenameLen <= 0 || filenameLen >= (int)(sizeof(filename)))
 		return -1;
 
 	strncpy(filename, req + strlen("$DOWNLOAD$"), filenameLen);
