@@ -2,7 +2,7 @@ CC = gcc
 
 CFLAGS = -Wall -Wextra -pedantic
 RELEASE_FLAGS = -march=native -O3
-DEBUG_FLAGS = -g -O0
+DEBUG_FLAGS = -g3 -O0
 # LDFLAGS = 
 
 SRCDIR = src
