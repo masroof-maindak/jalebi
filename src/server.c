@@ -200,7 +200,7 @@ int serv_wrap_upload(int cfd, char *buf) {
  * @param[buf] the buffer containing the request $UPLOAD$<filename>$
  */
 int serv_wrap_download(int cfd, char *buf) {
-	int fsize;
+	size_t fsize;
 	char *filename;
 
 	filename = buf + 8;
