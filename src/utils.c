@@ -1,10 +1,10 @@
 #include <dirent.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <stdint.h>
 
 #include "../include/utils.h"
 
@@ -98,9 +98,9 @@ cleanup:
  *
  * @note the file's existence must be guaranteed before calling this function
  */
-int serv_upload(char *filename, size_t bytes, int cfd) {
-	FILE *fp;
+int upload(char *filename, size_t bytes, int cfd) {
 	int bytesRead, toWrite, ret = 0;
+	FILE *fp;
 	char *buf;
 
 	if ((fp = fopen(filename, "r")) == NULL) {
@@ -118,7 +118,8 @@ int serv_upload(char *filename, size_t bytes, int cfd) {
 
 		toWrite = min(BUFSIZE, bytes);
 
-		if ((bytesRead = fread(buf, 1, toWrite, fp)) == -1) {
+		bytesRead = fread(buf, 1, toWrite, fp);
+		if (ferror(fp)) {
 			perror("fread()");
 			ret = 3;
 			goto cleanup;
@@ -152,7 +153,9 @@ cleanup:
 int serv_download(char *filename, size_t bytes, int cfd) {
 	FILE *fp;
 	int bytesRead, toRead, ret = 0;
-	char *buf;
+	char *buf, filepath[BUFSIZE << 1];
+
+	snprintf(filepath, sizeof(filepath), HOSTDIR "/%s", filename);
 
 	if ((fp = fopen(filename, "w")) == NULL) {
 		perror("fopen()");
@@ -176,7 +179,7 @@ int serv_download(char *filename, size_t bytes, int cfd) {
 		}
 
 		if (bytesRead != toRead) {
-			fprintf(stderr, "Error: socket read mismatch!");
+			fprintf(stderr, "Error: socket read mismatch!\n");
 			ret = 4;
 			goto cleanup;
 		}

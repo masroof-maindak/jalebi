@@ -25,32 +25,40 @@ void *handle_client(void *arg) {
 	cfd	   = *(int *)arg;
 	status = 0;
 
-	if ((bytesRead = recv(cfd, buf, BUFSIZE, 0)) == -1) {
-		perror("recv()");
-		goto cleanup;
-	}
-
-	reqType = identify_request(buf);
-
-	switch (reqType) {
-	case 1: /* $VIEW$ */
-		status = serv_wrap_view(cfd);
-		break;
-	case 2: /* $DOWNLOAD$<filename>$ */
-		status = serv_wrap_upload(cfd, buf);
-		break;
-	case 3: /* $UPLOAD$<filename>$ */
-		status = serv_wrap_download(cfd, buf);
-		break;
-	default:
-		if ((send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1) {
-			perror("send()");
+	while (status == 0) {
+		if ((bytesRead = recv(cfd, buf, BUFSIZE, 0)) == -1) {
+			perror("recv()");
 			goto cleanup;
 		}
-	}
 
-	if (status != 0)
-		fprintf(stderr, "Internal error occured in threaded operation!\n");
+		if (bytesRead == 0) {
+			printf("Client has closed the socket");
+			goto cleanup;
+		}
+
+		reqType = identify_request(buf);
+
+		switch (reqType) {
+		case 1: /* $VIEW$ */
+			status = serv_wrap_view(cfd);
+			break;
+		case 2: /* $DOWNLOAD$<filename>$ */
+			status = serv_wrap_upload(cfd, buf);
+			break;
+		case 3: /* $UPLOAD$<filename>$ */
+			status = serv_wrap_download(cfd, buf);
+			break;
+		default:
+			if ((send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1) {
+				perror("send()");
+				goto cleanup;
+			}
+		}
+
+		/* TODO: get rid of this eventually? */
+		if (status != 0)
+			fprintf(stderr, "Internal error occured in threaded operation!\n");
+	}
 
 cleanup:
 	free(buf);
@@ -171,7 +179,7 @@ int serv_wrap_upload(int cfd, char *buf) {
 	}
 
 	/* upload file */
-	if (serv_upload(filename, fsize, cfd) < 0) {
+	if (upload(filename, fsize, cfd) < 0) {
 		perror("upload()");
 		return -5;
 	}
@@ -195,7 +203,7 @@ int serv_wrap_download(int cfd, char *buf) {
 	int fsize;
 	char *filename;
 
-	filename = buf + 10;
+	filename = buf + 8;
 
 	/* TODO: validate_download_input */
 	/* if (validate_download_input(buf) != 0) { */
@@ -206,11 +214,12 @@ int serv_wrap_download(int cfd, char *buf) {
 	/* 	return -2; */
 	/* } */
 
-	if (recv(cfd, &fsize, sizeof(int), 0) == -1) {
+	if (recv(cfd, &fsize, sizeof(fsize), 0) == -1) {
 		perror("recv()");
 		return -3;
 	}
 
+	printf("here0\n\n");
 	/* TODO: check available space here and error out if none */
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
@@ -218,10 +227,13 @@ int serv_wrap_download(int cfd, char *buf) {
 		return -4;
 	}
 
+	printf("here1\n\n");
+	// FIXME
 	if (serv_download(filename, fsize, cfd) != 0) {
-		perror("download()");
+		fprintf(stderr, "serv_download()\n");
 		return -5;
 	}
+	printf("here2\n\n");
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send()");
@@ -255,6 +267,11 @@ int serv_wrap_view(int cfd) {
 			status = -3;
 		}
 		goto cleanup;
+	}
+
+	if ((send(cfd, &idx, sizeof(idx), 0)) == -1) {
+		perror("send()");
+		status = -3;
 	}
 
 	/* transfer information */
