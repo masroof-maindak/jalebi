@@ -3,7 +3,7 @@
 
 #include <sys/types.h>
 
-void run_length_encode(const char *str, char *result, size_t initial_size);
-void run_length_decode(char *encoded_string, char *result, size_t initial_size) ;
+int run_length_encode(const char *str, char *ret, size_t bytesToEncode);
+int run_length_decode(char *encStr, char *ret, size_t size);
 
 #endif // ENCODE_H

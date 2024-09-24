@@ -4,46 +4,61 @@
 #include "../include/encode.h"
 #include "../include/utils.h"
 
-/* TODO: refactor and return a (char *) rather than a void */
-/* NOTE: Should we really be stopping at a NULL-terminator */
-void run_length_encode(const char *str, char *ret, size_t size) {
+/**
+ * @param[bytesToEncode] len of input str
+ * @return < 0 if error else size of ret
+ */
+
+// Assuming that the size of ret = size of str
+// bytesToEncode = size of str
+int run_length_encode(const char *str, char *ret, size_t bytesToEncode) {
 	char current, prev;
 	size_t bytes = 0, idx = 1;
 	int count = 1;
 
-	if ((prev = str[0]) == '\0') {
-		ret = NULL;
-		return;
+	if (ret == NULL) {
+		return -1;
 	}
 
-	while ((current = str[idx++]) != '\0') {
+	if (bytesToEncode <= 1) {
+		return -2;
+	}
+
+	prev = str[0];
+	while (idx <= bytesToEncode) {
+		current = str[idx++];
 		if (current == prev) {
 			count++;
 		} else {
 
-			if ((ret = double_if_of(ret, idx, 10, &size)) == NULL)
-				return;
+			if ((ret = double_if_of(ret, idx, 10, &bytesToEncode)) == NULL)
+				return -3;
 
-			bytes += snprintf(ret + bytes, size - bytes, "%c%d", prev, count);
+			bytes += snprintf(ret + bytes, bytesToEncode - bytes, "%c%d", prev,
+							  count);
 
 			prev  = current;
 			count = 1;
 		}
 	}
 
-	if ((ret = double_if_of(ret, idx, 10, &size)) == NULL)
-		return;
+	if ((ret = double_if_of(ret, idx, 10, &bytesToEncode)) == NULL)
+		return -3;
 
-	snprintf(ret + bytes, size - bytes, "%c%d", prev, count);
-	return;
+	snprintf(ret + bytes, bytesToEncode - bytes, "%c%d", prev, count);
+	return 0;
 }
 
-void run_length_decode(char *encStr, char *ret, size_t size) {
+// Assuming ret size = encStr size
+int run_length_decode(char *encStr, char *ret, size_t size) {
 	char c;
 	int count;
 	size_t bytes = 0;
+	if (size <= 0) {
+		return -1;
+	}
 
-	for (int i = 0; encStr[i] != '\0';) {
+	for (int i = 0; i < size;) {
 		c = encStr[i];
 		i++;
 
@@ -60,8 +75,9 @@ void run_length_decode(char *encStr, char *ret, size_t size) {
 
 		while (count > 0) {
 
-			if ((ret = double_if_of(ret, bytes, 1, &size)) == NULL)
-				return;
+			if ((ret = double_if_of(ret, bytes, 1, &size)) == NULL) {
+				return -2;
+			}
 
 			ret[bytes++] = c;
 			count--;
@@ -69,5 +85,5 @@ void run_length_decode(char *encStr, char *ret, size_t size) {
 	}
 
 	ret[bytes] = '\0';
-	return;
+	return 0;
 }
