@@ -53,12 +53,12 @@ int run_length_encode(const char *str, char *ret, size_t bytesToEncode) {
 int run_length_decode(char *encStr, char *ret, size_t size) {
 	char c;
 	int count;
-	size_t bytes = 0;
-	if (size <= 0) {
-		return -1;
-	}
+	size_t bytes = 0, i = 0;
 
-	for (int i = 0; i < size;) {
+	if (size <= 0)
+		return -1;
+
+	for (i = 0; i < size;) {
 		c = encStr[i];
 		i++;
 
@@ -75,9 +75,8 @@ int run_length_decode(char *encStr, char *ret, size_t size) {
 
 		while (count > 0) {
 
-			if ((ret = double_if_of(ret, bytes, 1, &size)) == NULL) {
+			if ((ret = double_if_of(ret, bytes, 1, &size)) == NULL)
 				return -2;
-			}
 
 			ret[bytes++] = c;
 			count--;

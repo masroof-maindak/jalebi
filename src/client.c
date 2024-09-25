@@ -9,10 +9,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <readline/readline.h>
+
 #include "../include/client.h"
 #include "../include/utils.h"
 
-int handle_input(char userInput[]);
+int handle_input(char *userInput);
 int init_client_socket(struct sockaddr_in *saddr);
 uint8_t validate_user_input(const char *input, int reqType);
 
@@ -23,7 +25,7 @@ int main() {
 	signal(SIGINT, SIG_IGN);
 	int sfd, reqType, status = 0;
 	struct sockaddr_in saddr;
-	char userInput[BUFSIZE];
+	char *userInput = NULL;
 
 	if ((sfd = init_client_socket(&saddr)) < 0)
 		return 1;
@@ -70,7 +72,7 @@ int client_wrap_upload(int sfd, char *buf) {
 
 	/* verify existence */
 	if (stat(filepath, &fstat) != 0) {
-		if (errno == EBADF) {
+		if (errno == ENOENT) {
 			fprintf(stderr, "%sError: file does not exist\n%s", COL_RED,
 					COL_RESET);
 			return 0;
@@ -81,6 +83,7 @@ int client_wrap_upload(int sfd, char *buf) {
 	}
 
 	/* send upload message */
+	memset(msg, 0, sizeof(msg));
 	written = snprintf(msg, sizeof(msg), "$UPLOAD$%s$", filename);
 	if (send(sfd, msg, written, 0) == -1) {
 		perror("send()");
@@ -94,15 +97,16 @@ int client_wrap_upload(int sfd, char *buf) {
 		return -3;
 	}
 
-	printf("here1\n\n");
+	printf("#sent file size\n\n");
 
 	/* recv response */
+	// FIXME
 	if (recv(sfd, msg, sizeof(msg), 0) == -1) {
 		perror("recv()");
 		return -4;
 	}
 
-	printf("here2\n\n");
+	printf("#received file size ACK\n\n");
 
 	/* check response */
 
@@ -111,7 +115,7 @@ int client_wrap_upload(int sfd, char *buf) {
 		return -5;
 	}
 
-	puts("here3\n\n");
+	printf("#enough space present, starting upload\n\n");
 
 	/* upload file */
 	// FIXME
@@ -119,7 +123,7 @@ int client_wrap_upload(int sfd, char *buf) {
 		perror("upload()");
 		return -6;
 	}
-	puts("here3");
+	puts("#upload done\n\n");
 
 	return 0;
 }
@@ -192,7 +196,7 @@ uint8_t validate_user_input(const char *input, int reqType) {
 	 * Validate input depending on what type of request it is
 	 * - e.g for $VIEW$, nothing should lie after the second '$'
 	 * - For download and upload, there must be a string between
-	 *   the second and third '$'s
+	 *   the second and last '$'s
 	 */
 
 	size_t len = strlen(input);
@@ -226,17 +230,10 @@ uint8_t validate_user_input(const char *input, int reqType) {
 	return 0;
 }
 
-int handle_input(char userInput[]) {
+int handle_input(char *userInput) {
 	int reqType = -1;
 
-	printf("namak-paare > ");
-
-	if (!fgets(userInput, USER_INPUT_LIMIT, stdin)) {
-		puts("");
-		return 4;
-	}
-
-	userInput[strcspn(userInput, "\n")] = 0;
+	userInput = readline("namak-paare > ");
 
 	if (strcmp(userInput, "exit") == 0)
 		return 4;

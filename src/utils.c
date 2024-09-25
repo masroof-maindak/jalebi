@@ -157,7 +157,7 @@ int serv_download(char *filename, size_t bytes, int cfd) {
 
 	snprintf(filepath, sizeof(filepath), HOSTDIR "/%s", filename);
 
-	if ((fp = fopen(filename, "w")) == NULL) {
+	if ((fp = fopen(filepath, "w")) == NULL) {
 		perror("fopen()");
 		return 1;
 	}

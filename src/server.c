@@ -214,12 +214,15 @@ int serv_wrap_download(int cfd, char *buf) {
 	/* 	return -2; */
 	/* } */
 
+	printf("#waiting on file size\n\n");
+
+	// FIXME
 	if (recv(cfd, &fsize, sizeof(fsize), 0) == -1) {
 		perror("recv()");
 		return -3;
 	}
 
-	printf("here0\n\n");
+	printf("#sending file size ACK\n\n");
 	/* TODO: check available space here and error out if none */
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
@@ -227,13 +230,14 @@ int serv_wrap_download(int cfd, char *buf) {
 		return -4;
 	}
 
-	printf("here1\n\n");
-	// FIXME
+	printf("#initiating download\n\n");
+
 	if (serv_download(filename, fsize, cfd) != 0) {
 		fprintf(stderr, "serv_download()\n");
 		return -5;
 	}
-	printf("here2\n\n");
+
+	printf("#download complete\n\n");
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send()");
