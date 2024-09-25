@@ -12,6 +12,7 @@
 #include <readline/readline.h>
 
 #include "../include/client.h"
+#include "../include/encode.h"
 #include "../include/utils.h"
 
 int main() {
@@ -58,10 +59,36 @@ int main() {
 	return 0;
 }
 
+int send_encoded_buffer(int cfd, char *encodedBuf, size_t bufSize) {
+	size_t bytesSent = 0;
+	int ret			 = 0;
+
+	while (bytesSent < bufSize) {
+		size_t chunkSize =
+			(bufSize - bytesSent) > BUFSIZE ? BUFSIZE : (bufSize - bytesSent);
+
+		if (send(cfd, &chunkSize, sizeof(chunkSize), 0) == -1) {
+			perror("send() chunk size");
+			ret = -1;
+			break;
+		}
+
+		if (send(cfd, encodedBuf + bytesSent, chunkSize, 0) == -1) {
+			perror("send() chunk data");
+			ret = -1;
+			break;
+		}
+		bytesSent += chunkSize;
+	}
+
+	return ret;
+}
 int client_upload(char *filename, size_t bytes, int cfd) {
 	int bytesRead, toWrite, ret = 0;
 	FILE *fp;
 	char *buf;
+	int bufSize;
+	char *encodedBuf;
 
 	// TODO: add encoding
 
@@ -93,9 +120,21 @@ int client_upload(char *filename, size_t bytes, int cfd) {
 			goto cleanup;
 		}
 
-		if (send(cfd, buf, bytesRead, 0) == -1) {
-			perror("send()");
+		if ((encodedBuf = malloc(bytesRead) == NULL)) {
+			perror("malloc()");
 			ret = 5;
+			goto cleanup;
+		}
+		bufSize = run_length_encode(buf, encodedBuf, bytesRead);
+		if (bufSize < 0) {
+			fprintf(stderr, "run_lenghth_encode():");
+			ret = 6;
+			goto cleanup;
+		}
+
+		if (send_encoded_buffer(cfd, encodedBuf, bufSize) < 0) {
+			fprintf(stderr, "send()");
+			ret = 7;
 			goto cleanup;
 		}
 
@@ -103,6 +142,9 @@ int client_upload(char *filename, size_t bytes, int cfd) {
 	}
 
 cleanup:
+	if (encodedBuf != NULL) {
+		free(encodedBuf);
+	}
 	free(buf);
 	fclose(fp);
 	return ret;
