@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <dirent.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -255,6 +256,7 @@ int serv_wrap_upload(int cfd, char *buf) {
 int serv_wrap_download(int cfd, char *buf) {
 	size_t fsize;
 	char *filename;
+	__off_t usedSpace;
 
 	filename = buf + 8;
 
@@ -263,21 +265,34 @@ int serv_wrap_download(int cfd, char *buf) {
 		return -3;
 	}
 
-	/* TODO: check available space here and error out if none */
+
+	if ((usedSpace = get_used_space(HOSTDIR)) + fsize > MAX_CLIENT_SPACE) {
+		if (send(cfd, ULOAD_FAILURE_MSG, sizeof(ULOAD_FAILURE_MSG), 0) == -1) {
+			perror("send()");
+			return -5;
+		}
+		return 4;
+	} else if (usedSpace < 0) {
+		if (send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0) == -1) {
+			perror("send()");
+			return -5;
+		}
+		return -4;
+	}
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send()");
-		return -4;
+		return -5;
 	}
 
 	if (serv_download(filename, fsize, cfd) != 0) {
 		fprintf(stderr, "serv_download()\n");
-		return -5;
+		return -6;
 	}
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send()");
-		return -6;
+		return -7;
 	}
 
 	return 0;
@@ -390,4 +405,34 @@ void ensure_srv_dir_exists() {
 			return;
 		}
 	}
+}
+
+__off_t get_used_space(const char *dir) {
+	struct dirent *entry;
+	struct stat st;
+	char filepath[BUFSIZE];
+	int size = 0;
+	DIR *d;
+
+	if ((d = opendir(dir)) == NULL) {
+		perror("opendir()");
+		return -1;
+	}
+
+	while ((entry = readdir(d)) != NULL) {
+		if (!strcmp(entry->d_name, ".") || strcmp(entry->d_name, "..") == 0)
+			continue;
+
+		snprintf(filepath, sizeof(filepath), "%s/%s", dir, entry->d_name);
+		if (stat(filepath, &st) == -1) {
+			perror("stat()");
+			closedir(d);
+			return -2;
+		}
+
+		size += st.st_size;
+	}
+
+	closedir(d);
+	return size;
 }
