@@ -16,7 +16,7 @@
 
 int handle_input(char *userInput);
 int init_client_socket(struct sockaddr_in *saddr);
-uint8_t validate_user_input(const char *input, int reqType);
+uint8_t valid_user_input(const char *input, int reqType, size_t len);
 
 int client_wrap_view(int sfd);
 int client_wrap_upload(int sfd, char *buf);
@@ -36,6 +36,8 @@ int main() {
 	/* TODO: login/registration... */
 
 	while (status == 0) {
+		userInput = readline("namak-paare > ");
+
 		if ((reqType = handle_input(userInput)) < 0)
 			continue;
 
@@ -192,58 +194,9 @@ int init_client_socket(struct sockaddr_in *saddr) {
 	return sfd;
 }
 
-uint8_t validate_view(const char *input) {
- return (!(strncmp(input, "$VIEW$", 6) == 0 && input[6] == '\0'));
-}
-
-
-uint8_t validate_download(const char *input) {
-    size_t len = strlen(input);
-    if (strncmp(input, "$DOWNLOAD$", 10) == 0 && input[len - 1] == '$') {
-        // Ensure  that there is a string (file_name) between the second and last $
-        if (len > 11 && input[10] != '$') {
-            return 0; 
-        }
-    }
-    return 1;
-}
-
-
-uint8_t validate_upload(const char *input) {
-    size_t len = strlen(input);
-
-    if (strncmp(input, "$UPLOAD$", 8) == 0 && input[len - 1] == '$') {
-        if (len > 9 && input[8] != '$') {
-            return 0; 
-        }
-    }
-    return 1;
-}
-
-
-
-
-
-uint8_t validate_user_input(const char *input, int reqType) {
-
-	
-	size_t len = strlen(input);
-	switch (reqType) {
-	case 1:
-        return validate_view(input);
-	case 2:
-		return validate_download(input);
-	case 3:
-		return validate_upload(input);
-	}
-
-}
-
-
 int handle_input(char *userInput) {
+	size_t len	= strlen(userInput);
 	int reqType = -1;
-
-	userInput = readline("namak-paare > ");
 
 	if (strcmp(userInput, "exit") == 0)
 		return 4;
@@ -255,10 +208,30 @@ int handle_input(char *userInput) {
 		return -2;
 	}
 
-	if (validate_user_input(userInput, reqType) != 0) {
+	if (!valid_user_input(userInput, reqType, len)) {
 		fprintf(stderr, "%sError: invalid format!%s\n", COL_RED, COL_RESET);
 		return -3;
 	}
 
+	userInput[len - 1] = '\0';
 	return reqType;
+}
+
+uint8_t valid_user_input(const char *input, int reqType, size_t len) {
+	switch (reqType) {
+	case 1:
+		return input[6] == '\0';
+		break;
+	case 2:
+		if (input[len - 1] == '$')
+			if (len > 11 && input[10] != '$')
+				return 1;
+		break;
+	case 3:
+		if (input[len - 1] == '$')
+			if (len > 9 && input[8] != '$')
+				return 1;
+		break;
+	}
+	return 0;
 }
