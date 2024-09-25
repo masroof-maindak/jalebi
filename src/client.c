@@ -125,36 +125,31 @@ int recv_success(int sfd, char *errMsg) {
 }
 
 int client_wrap_upload(int sfd, char *buf) {
-	char filepath[BUFSIZE], *filename, *tmp;
-	size_t fsize = 0, written;
-	char msg[BUFSIZE], *token;
+	char *filepath, *filename, *saveFilename = NULL, msg[BUFSIZE];
 	struct stat fstat;
+	size_t fsize = 0, written;
 
 	filepath = buf + 8;
-
 	if (stat(filepath, &fstat) != 0) {
 		if (errno == ENOENT) {
-			fprintf(stderr, "%sError: file does not exist\n%s");
-			free(filepath_copy);
+			fprintf(stderr, "Error: file does not exist\n");
 			return 0;
 		} else {
 			perror("stat()");
-			free(filepath_copy);
 			return -2;
 		}
 	}
 
 	filename = strtok(filepath, "/");
 	if ((filename = strtok(filepath, "/")) != NULL) {
-		tmp = filename;
-		while ((filename = strtok(NULL, "/")) != NULL)
-			tmp = filename;
+		do {
+			saveFilename = filename;
+		} while ((filename = strtok(NULL, "/")) != NULL);
 	}
-	filename = tmp;
 
 	/* send upload message */
 	memset(msg, 0, sizeof(msg));
-	written = snprintf(msg, sizeof(msg), "$UPLOAD$%s", filename);
+	written = snprintf(msg, sizeof(msg), "$UPLOAD$%s", saveFilename);
 	if (send(sfd, msg, written, 0) == -1) {
 		perror("send()");
 		return -1;
@@ -170,13 +165,15 @@ int client_wrap_upload(int sfd, char *buf) {
 	if ((recv_success(sfd, "Error: Not enough space available!")) < 0)
 		return -4;
 
-	if (serv_upload(filename, fsize, sfd) < 0) {
+	if (client_upload(saveFilename, fsize, sfd) < 0) {
 		perror("upload()");
 		return -5;
 	}
 
 	if ((recv_success(sfd, "Error: something went wrong!")) < 0)
 		return -4;
+
+	printf(COL_GREEN "File uploaded to server successfully!\n" COL_RESET);
 
 	return 0;
 }

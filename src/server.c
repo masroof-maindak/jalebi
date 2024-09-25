@@ -56,7 +56,8 @@ void *handle_client(void *arg) {
 			}
 		}
 
-		/* TODO: get rid of this eventually? */
+		memset(buf, 0, BUFSIZE);
+
 		if (status != 0)
 			fprintf(stderr, "Internal error occured in threaded operation!\n");
 	}
@@ -264,7 +265,6 @@ int serv_wrap_download(int cfd, char *buf) {
 		perror("recv()");
 		return -3;
 	}
-
 
 	if ((usedSpace = get_used_space(HOSTDIR)) + fsize > MAX_CLIENT_SPACE) {
 		if (send(cfd, ULOAD_FAILURE_MSG, sizeof(ULOAD_FAILURE_MSG), 0) == -1) {
