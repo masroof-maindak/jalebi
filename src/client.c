@@ -167,30 +167,36 @@ int recv_success(int sfd, char *errMsg) {
 }
 
 int client_wrap_upload(int sfd, char *buf) {
-	char *filepath, *filename;
+	char filepath[BUFSIZE], *filename, *tmp;
 	size_t fsize = 0, written;
-	char msg[BUFSIZE];
+	char msg[BUFSIZE], *token;
 	struct stat fstat;
 
 	filepath = buf + 8;
-	/* TODO: extract file name from path; just one strtok? */
-	filename = filepath;
 
-	/* verify existence */
 	if (stat(filepath, &fstat) != 0) {
 		if (errno == ENOENT) {
-			fprintf(stderr, "%sError: file does not exist\n%s", COL_RED,
-					COL_RESET);
+			fprintf(stderr, "%sError: file does not exist\n%s");
+			free(filepath_copy);
 			return 0;
 		} else {
 			perror("stat()");
+			free(filepath_copy);
 			return -2;
 		}
 	}
 
+	filename = strtok(filepath, "/");
+	if ((filename = strtok(filepath, "/")) != NULL) {
+		tmp = filename;
+		while ((filename = strtok(NULL, "/")) != NULL)
+			tmp = filename;
+	}
+	filename = tmp;
+
 	/* send upload message */
 	memset(msg, 0, sizeof(msg));
-	written = snprintf(msg, sizeof(msg), "$UPLOAD$%s$", filename);
+	written = snprintf(msg, sizeof(msg), "$UPLOAD$%s", filename);
 	if (send(sfd, msg, written, 0) == -1) {
 		perror("send()");
 		return -1;
