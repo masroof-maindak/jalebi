@@ -54,6 +54,9 @@ int main() {
 		default:
 			break;
 		}
+
+		free(userInput);
+		userInput = NULL;
 	}
 
 	close(sfd);
