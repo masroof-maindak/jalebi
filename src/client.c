@@ -102,6 +102,7 @@ int client_wrap_upload(int sfd, char *buf) {
 
 	printf("#sent file size\n\n");
 
+	// client gets blocked here!!
 	/* recv response */
 	// FIXME
 	if (recv(sfd, msg, sizeof(msg), 0) == -1) {
@@ -191,47 +192,53 @@ int init_client_socket(struct sockaddr_in *saddr) {
 	return sfd;
 }
 
-/* FIXME */
+uint8_t validate_view(const char *input) {
+ return (!(strncmp(input, "$VIEW$", 6) == 0 && input[6] == '\0'));
+}
+
+
+uint8_t validate_download(const char *input) {
+    size_t len = strlen(input);
+    if (strncmp(input, "$DOWNLOAD$", 10) == 0 && input[len - 1] == '$') {
+        // Ensure  that there is a string (file_name) between the second and last $
+        if (len > 11 && input[10] != '$') {
+            return 0; 
+        }
+    }
+    return 1;
+}
+
+
+uint8_t validate_upload(const char *input) {
+    size_t len = strlen(input);
+
+    if (strncmp(input, "$UPLOAD$", 8) == 0 && input[len - 1] == '$') {
+        if (len > 9 && input[8] != '$') {
+            return 0; 
+        }
+    }
+    return 1;
+}
+
+
+
+
+
 uint8_t validate_user_input(const char *input, int reqType) {
-	return 0;
 
-	/*
-	 * Validate input depending on what type of request it is
-	 * - e.g for $VIEW$, nothing should lie after the second '$'
-	 * - For download and upload, there must be a string between
-	 *   the second and last '$'s
-	 */
-
+	
 	size_t len = strlen(input);
 	switch (reqType) {
 	case 1:
-		break;
+        return validate_view(input);
 	case 2:
-		break;
+		return validate_download(input);
 	case 3:
-		break;
+		return validate_upload(input);
 	}
 
-	if (len < 7)
-		return 0;
-
-	if (!strncmp(input, "$VIEW$", 6) && input[6] == '\n')
-		return 1;
-
-	if (strncmp(input, "$DOWNLOAD$", 10) == 0) {
-		if (len > 11 && input[len - 2] != '$')
-			return 0;
-		return 1;
-	}
-
-	if (strncmp(input, "$UPLOAD$", 8) == 0) {
-		if (len > 9 && input[len - 2] != '$')
-			return 0;
-		return 1;
-	}
-
-	return 0;
 }
+
 
 int handle_input(char *userInput) {
 	int reqType = -1;
