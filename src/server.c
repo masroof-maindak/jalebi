@@ -143,6 +143,59 @@ int init_server_socket(struct sockaddr_in *saddr) {
 }
 
 /**
+ * @brief upload `bytes` bytes, from `filename` file, to the client's socket
+ *
+ * @note the file's existence must be guaranteed before calling this function
+ */
+int serv_upload(char *filename, size_t bytes, int cfd) {
+	int bytesRead, toWrite, ret = 0;
+	FILE *fp;
+	char *buf;
+
+	if ((fp = fopen(filename, "r")) == NULL) {
+		perror("fopen()");
+		return 1;
+	}
+
+	if ((buf = malloc(BUFSIZE)) == NULL) {
+		perror("malloc()");
+		fclose(fp);
+		return 2;
+	}
+
+	while (bytes > 0) {
+
+		toWrite = min(BUFSIZE, bytes);
+
+		bytesRead = fread(buf, 1, toWrite, fp);
+		if (ferror(fp)) {
+			perror("fread()");
+			ret = 3;
+			goto cleanup;
+		}
+
+		if (bytesRead != toWrite) {
+			fprintf(stderr, "Error: file read mismatch!");
+			ret = 4;
+			goto cleanup;
+		}
+
+		if (send(cfd, buf, bytesRead, 0) == -1) {
+			perror("send()");
+			ret = 5;
+			goto cleanup;
+		}
+
+		bytes -= bytesRead;
+	}
+
+cleanup:
+	free(buf);
+	fclose(fp);
+	return ret;
+}
+
+/**
  * @details This function is called when the user opts to DOWNLOAD a file.
  * 	- we must check if the file exists inside HOSTDIR
  * 	- If not, send back $FAILURE$FILE_NOT_FOUND$
@@ -179,7 +232,7 @@ int serv_wrap_upload(int cfd, char *buf) {
 	}
 
 	/* upload file */
-	if (upload(filename, fsize, cfd) < 0) {
+	if (serv_upload(filename, fsize, cfd) < 0) {
 		perror("upload()");
 		return -5;
 	}
@@ -205,24 +258,11 @@ int serv_wrap_download(int cfd, char *buf) {
 
 	filename = buf + 8;
 
-	/* TODO: validate_download_input */
-	/* if (validate_download_input(buf) != 0) { */
-	/* 	if (send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0) == -1) { */
-	/* 		perror("send()"); */
-	/* 		return -1; */
-	/* 	} */
-	/* 	return -2; */
-	/* } */
-
-	printf("#waiting on file size\n\n");
-
-	// FIXME
 	if (recv(cfd, &fsize, sizeof(fsize), 0) == -1) {
 		perror("recv()");
 		return -3;
 	}
 
-	printf("#sending file size ACK\n\n");
 	/* TODO: check available space here and error out if none */
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
@@ -230,14 +270,10 @@ int serv_wrap_download(int cfd, char *buf) {
 		return -4;
 	}
 
-	printf("#initiating download\n\n");
-
 	if (serv_download(filename, fsize, cfd) != 0) {
 		fprintf(stderr, "serv_download()\n");
 		return -5;
 	}
-
-	printf("#download complete\n\n");
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send()");
@@ -245,6 +281,60 @@ int serv_wrap_download(int cfd, char *buf) {
 	}
 
 	return 0;
+}
+
+/**
+ * @brief download a total of 'bytes' bytes from a client, into
+ * `filename` file
+ */
+int serv_download(char *filename, size_t bytes, int cfd) {
+	FILE *fp;
+	int bytesRead, toRead, ret = 0;
+	char *buf, filepath[BUFSIZE << 1];
+
+	snprintf(filepath, sizeof(filepath), HOSTDIR "/%s", filename);
+
+	if ((fp = fopen(filepath, "w")) == NULL) {
+		perror("fopen()");
+		return 1;
+	}
+
+	if ((buf = malloc(BUFSIZE)) == NULL) {
+		perror("malloc()");
+		ret = 2;
+		goto cleanup;
+	}
+
+	while (bytes > 0) {
+
+		toRead = min(BUFSIZE, bytes);
+
+		if ((bytesRead = recv(cfd, buf, toRead, 0)) == -1) {
+			perror("recv()");
+			ret = 3;
+			goto cleanup;
+		}
+
+		if (bytesRead != toRead) {
+			fprintf(stderr, "Error: socket read mismatch!\n");
+			ret = 4;
+			goto cleanup;
+		}
+
+		fwrite(buf, bytesRead, 1, fp);
+		if (ferror(fp)) {
+			perror("fwrite()");
+			ret = 5;
+			goto cleanup;
+		}
+
+		bytes -= toRead;
+	}
+
+cleanup:
+	free(buf);
+	fclose(fp);
+	return ret;
 }
 
 int serv_wrap_view(int cfd) {

@@ -14,13 +14,6 @@
 #include "../include/client.h"
 #include "../include/utils.h"
 
-int handle_input(char *userInput);
-int init_client_socket(struct sockaddr_in *saddr);
-uint8_t valid_user_input(const char *input, int reqType, size_t len);
-
-int client_wrap_view(int sfd);
-int client_wrap_upload(int sfd, char *buf);
-
 int main() {
 	signal(SIGINT, SIG_IGN);
 	int sfd, reqType, status = 0;
@@ -65,6 +58,72 @@ int main() {
 	return 0;
 }
 
+int client_upload(char *filename, size_t bytes, int cfd) {
+	int bytesRead, toWrite, ret = 0;
+	FILE *fp;
+	char *buf;
+
+	// TODO: add encoding
+
+	if ((fp = fopen(filename, "r")) == NULL) {
+		perror("fopen()");
+		return 1;
+	}
+
+	if ((buf = malloc(BUFSIZE)) == NULL) {
+		perror("malloc()");
+		fclose(fp);
+		return 2;
+	}
+
+	while (bytes > 0) {
+
+		toWrite = min(BUFSIZE, bytes);
+
+		bytesRead = fread(buf, 1, toWrite, fp);
+		if (ferror(fp)) {
+			perror("fread()");
+			ret = 3;
+			goto cleanup;
+		}
+
+		if (bytesRead != toWrite) {
+			fprintf(stderr, "Error: file read mismatch!");
+			ret = 4;
+			goto cleanup;
+		}
+
+		if (send(cfd, buf, bytesRead, 0) == -1) {
+			perror("send()");
+			ret = 5;
+			goto cleanup;
+		}
+
+		bytes -= bytesRead;
+	}
+
+cleanup:
+	free(buf);
+	fclose(fp);
+	return ret;
+}
+
+int recv_success(int sfd, char *errMsg) {
+	char msg[BUFSIZE];
+
+	if (recv(sfd, msg, sizeof(msg), 0) == -1) {
+		perror("recv()");
+		return -4;
+	}
+
+	if (!(strncmp(msg, SUCCESS_MSG, sizeof(SUCCESS_MSG)) == 0)) {
+		fprintf(stderr, "%s\n", errMsg);
+		return -5;
+	}
+
+	return 0;
+}
+
 int client_wrap_upload(int sfd, char *buf) {
 	char *filepath, *filename;
 	size_t fsize = 0, written;
@@ -102,34 +161,16 @@ int client_wrap_upload(int sfd, char *buf) {
 		return -3;
 	}
 
-	printf("#sent file size\n\n");
-
-	// client gets blocked here!!
-	/* recv response */
-	// FIXME
-	if (recv(sfd, msg, sizeof(msg), 0) == -1) {
-		perror("recv()");
+	if ((recv_success(sfd, "Error: Not enough space available!")) < 0)
 		return -4;
-	}
 
-	printf("#received file size ACK\n\n");
-
-	/* check response */
-
-	if (!(strncmp(msg, SUCCESS_MSG, sizeof(SUCCESS_MSG)) == 0)) {
-		fprintf(stderr, "Error: Not enough space available!\n");
+	if (serv_upload(filename, fsize, sfd) < 0) {
+		perror("upload()");
 		return -5;
 	}
 
-	printf("#enough space present, starting upload\n\n");
-
-	/* upload file */
-	// FIXME
-	if (upload(filename, fsize, sfd) < 0) {
-		perror("upload()");
-		return -6;
-	}
-	puts("#upload done\n\n");
+	if ((recv_success(sfd, "Error: something went wrong!")) < 0)
+		return -4;
 
 	return 0;
 }
@@ -233,5 +274,6 @@ uint8_t valid_user_input(const char *input, int reqType, size_t len) {
 				return 1;
 		break;
 	}
+
 	return 0;
 }
