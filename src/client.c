@@ -150,10 +150,14 @@ int client_wrap_upload(int sfd, char *buf) {
 	/* send upload message */
 	memset(msg, 0, sizeof(msg));
 	written = snprintf(msg, sizeof(msg), "$UPLOAD$%s", saveFilename);
+	printf("SENDING ULOAD MSG OF SIZE: %ld\n", written);
+	printf("%s\n", msg);
 	if (send(sfd, msg, written, 0) == -1) {
 		perror("send()");
 		return -1;
 	}
+
+	printf("MSG SENT, SENDING FILE SIZE\n");
 
 	/* send fsize */
 	fsize = fstat.st_size;
@@ -161,14 +165,21 @@ int client_wrap_upload(int sfd, char *buf) {
 		perror("send()");
 		return -3;
 	}
+	printf("FSIZE: %ld\n", fsize);
+
+	printf("FILE SIZE SENT\n");
 
 	if ((recv_success(sfd, "Error: Not enough space available!")) < 0)
 		return -4;
+
+	printf("SPACE AVLBL, UPLOADING\n");
 
 	if (client_upload(saveFilename, fsize, sfd) < 0) {
 		perror("upload()");
 		return -5;
 	}
+
+	printf("CLIENT UPLOADING COMPLETE\n");
 
 	if ((recv_success(sfd, "Error: something went wrong!")) < 0)
 		return -4;

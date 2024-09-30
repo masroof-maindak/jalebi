@@ -32,6 +32,8 @@ void *handle_client(void *arg) {
 			goto cleanup;
 		}
 
+		printf("CLIENT SENT: %s\n", buf);
+
 		if (bytesRead == 0) {
 			printf("Client has closed the socket");
 			goto cleanup;
@@ -259,12 +261,16 @@ int serv_wrap_download(int cfd, char *buf) {
 	char *filename;
 	__off_t usedSpace;
 
+	printf("ENTERED DOWNLOAD WRAPPER\n");
+
 	filename = buf + 8;
 
 	if (recv(cfd, &fsize, sizeof(fsize), 0) == -1) {
 		perror("recv()");
 		return -3;
 	}
+
+	printf("RECEIVED FILE SIZE\n");
 
 	if ((usedSpace = get_used_space(HOSTDIR)) + fsize > MAX_CLIENT_SPACE) {
 		if (send(cfd, ULOAD_FAILURE_MSG, sizeof(ULOAD_FAILURE_MSG), 0) == -1) {
@@ -280,15 +286,21 @@ int serv_wrap_download(int cfd, char *buf) {
 		return -4;
 	}
 
+	printf("SPACE AVAILABLE\n");
+
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send()");
 		return -5;
 	}
 
+	printf("SPACE SUCCESS MSG SENT\n");
+
 	if (serv_download(filename, fsize, cfd) != 0) {
 		fprintf(stderr, "serv_download()\n");
 		return -6;
 	}
+
+	printf("DOWNLOAD COMPLETE\n");
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send()");
