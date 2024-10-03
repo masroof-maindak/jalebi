@@ -5,7 +5,7 @@ client_line="client.c:92"
 server_line="server.c:217"
 
 client_fn="client_wrap_upload"
-server_fn="serv_wrap_download"
+server_fn="handle_client"
 # ----------------------- #
 
 debug_mode="fn" # fn or line

@@ -1,6 +1,5 @@
 #include <arpa/inet.h>
 #include <errno.h>
-#include <netinet/in.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -156,6 +155,9 @@ int client_wrap_upload(int sfd, char *buf) {
 		perror("send()");
 		return -1;
 	}
+
+	if ((recv_success(sfd, "Error: something went wrong!")) < 0)
+		return -2;
 
 	printf("MSG SENT, SENDING FILE SIZE\n");
 

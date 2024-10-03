@@ -1,6 +1,5 @@
 #include <arpa/inet.h>
 #include <dirent.h>
-#include <netinet/in.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,7 +34,7 @@ void *handle_client(void *arg) {
 		printf("CLIENT SENT: %s\n", buf);
 
 		if (bytesRead == 0) {
-			printf("Client has closed the socket");
+			printf("Client has closed the socket!\n");
 			goto cleanup;
 		}
 
@@ -262,6 +261,11 @@ int serv_wrap_download(int cfd, char *buf) {
 	__off_t usedSpace;
 
 	printf("ENTERED DOWNLOAD WRAPPER\n");
+
+	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
+		perror("send()");
+		return -2;
+	}
 
 	filename = buf + 8;
 
