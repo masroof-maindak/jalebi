@@ -11,6 +11,7 @@
 int handle_input(char *userInput);
 int init_client_socket(struct sockaddr_in *saddr);
 uint8_t valid_user_input(const char *input, int reqType, size_t len);
+char *extract_filename_if_exists(const char *filepath, struct stat *fstat);
 
 int client_wrap_view(int sfd);
 int client_wrap_upload(int sfd, char *buf);

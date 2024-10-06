@@ -208,17 +208,17 @@ cleanup:
 	return ret;
 }
 
-int recv_success(int sfd, char *errMsg) {
+int recv_success(int sfd, char *err) {
 	char msg[BUFSIZE];
 
 	if (recv(sfd, msg, sizeof(msg), 0) == -1) {
 		perror("recv()");
-		return -4;
+		return -1;
 	}
 
 	if (!(strncmp(msg, SUCCESS_MSG, sizeof(SUCCESS_MSG)) == 0)) {
-		fprintf(stderr, "%s\n", errMsg);
-		return -5;
+		fprintf(stderr, COL_RED "%s\n", err);
+		return -2;
 	}
 
 	return 0;

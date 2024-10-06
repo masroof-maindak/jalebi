@@ -219,7 +219,6 @@ int serv_wrap_download(int cfd, char *buf) {
 		return -2;
 	}
 
-	/* TODO: error handling? */
 	filename = buf + 8;
 
 	if (recv(cfd, &fsize, sizeof(fsize), 0) == -1) {

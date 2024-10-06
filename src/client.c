@@ -72,83 +72,95 @@ int client_wrap_download(int sfd, char *buf) {
 
 	/* either it wasn't there or we get back the filesize */
 	if ((recv_success(sfd, "File not available on server, try $VIEW$")) < 0)
-		return -2;
+		return 0;
 
 	/* tell server we're ready to accept size */
 	if (send(sfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send()");
-		return -3;
+		return -2;
 	}
 
 	/* recv size */
 	if (recv(sfd, &fsize, sizeof(fsize), 0) == -1) {
 		perror("recv()");
-		return -4;
+		return -3;
 	}
 
 	/* download file */
 	if (download(filename, fsize, sfd) != 0) {
 		fprintf(stderr, "download()\n");
-		return -5;
+		return -4;
 	}
 
 	return 0;
 }
 
-int client_wrap_upload(int sfd, char *buf) {
-	char *filepath, *filename, *saveFilename = NULL, msg[BUFSIZE];
-	struct stat fstat;
-	size_t fsize = 0, written;
+char *extract_filename_if_exists(const char *fpath, struct stat *fstat) {
+	char *fpSave, *fname, *fnSave = NULL;
 
-	filepath = buf + 8;
-	if (stat(filepath, &fstat) != 0) {
+	if (stat(fpath, fstat) != 0) {
 		if (errno == ENOENT) {
 			fprintf(stderr, "Error: file does not exist\n");
-			return 0;
+			return NULL;
 		} else {
 			perror("stat()");
-			return -2;
+			return NULL;
 		}
 	}
 
-	/* FIXME */
-	filename = strtok(filepath, "/");
-	if ((filename = strtok(filepath, "/")) != NULL) {
+	if ((fpSave = copy_string(fpath)) == NULL)
+		return NULL;
+
+	if ((fname = strtok(fpSave, "/")) != NULL) {
 		do {
-			saveFilename = filename;
-		} while ((filename = strtok(NULL, "/")) != NULL);
+			fnSave = fname;
+		} while ((fname = strtok(NULL, "/")) != NULL);
 	}
+
+	fname = fnSave;
+
+	char *result = copy_string(fname);
+	free(fpSave);
+	return result;
+}
+
+int client_wrap_upload(int sfd, char *buf) {
+	char *filepath = buf + 8, *filename = NULL, msg[BUFSIZE];
+	struct stat fstat;
+	size_t fsize = 0, written;
+
+	if ((filename = extract_filename_if_exists(filepath, &fstat)) == NULL)
+		return -1;
 
 	/* send upload message */
-	memset(msg, 0, sizeof(msg));
-	written = snprintf(msg, sizeof(msg), "$UPLOAD$%s", saveFilename);
-	printf("SENDING ULOAD MSG OF SIZE: %ld\n", written);
-	printf("%s\n", msg);
+	written = snprintf(msg, sizeof(msg), "$UPLOAD$%s", filename);
 	if (send(sfd, msg, written, 0) == -1) {
 		perror("send()");
-		return -1;
+		return -2;
 	}
 
+	free(filename);
+
 	if ((recv_success(sfd, "Error: something went wrong!")) < 0)
-		return -2;
+		return -3;
 
 	/* send fsize */
 	fsize = fstat.st_size;
 	if (send(sfd, &fsize, sizeof(fsize), 0) == -1) {
 		perror("send()");
-		return -3;
+		return -4;
 	}
 
 	if ((recv_success(sfd, "Error: Not enough space available!")) < 0)
-		return -4;
-
-	if (upload(saveFilename, fsize, sfd) < 0) {
-		perror("upload()");
 		return -5;
+
+	if (upload(filepath, fsize, sfd) < 0) {
+		perror("upload()");
+		return -6;
 	}
 
 	if ((recv_success(sfd, "Error: something went wrong!")) < 0)
-		return -4;
+		return -7;
 
 	printf(COL_GREEN "File uploaded to server successfully!\n" COL_RESET);
 	return 0;
@@ -243,14 +255,12 @@ uint8_t valid_user_input(const char *input, int reqType, size_t len) {
 		return input[6] == '\0';
 		break;
 	case 2:
-		if (input[len - 1] == '$')
-			if (len > 11 && input[10] != '$')
-				return 1;
+		if (input[len - 1] == '$' && len > 11 && input[10] != '$')
+			return 1;
 		break;
 	case 3:
-		if (input[len - 1] == '$')
-			if (len > 9 && input[8] != '$')
-				return 1;
+		if (input[len - 1] == '$' && len > 9 && input[8] != '$')
+			return 1;
 		break;
 	}
 
