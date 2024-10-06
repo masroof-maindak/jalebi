@@ -38,6 +38,7 @@ int main() {
 			status = client_wrap_view(sfd);
 			break;
 		case 2: /* $DOWNLOAD$<filename>$\n */
+			status = client_wrap_download(sfd, userInput);
 			break;
 		case 3: /* $UPLOAD$<filename>$\n */
 			status = client_wrap_upload(sfd, userInput);
@@ -57,66 +58,37 @@ int main() {
 	return 0;
 }
 
-int client_upload(char *filename, size_t bytes, int cfd) {
-	int bytesRead, toWrite, ret = 0;
-	FILE *fp;
-	char *buf;
+int client_wrap_download(int sfd, char *buf) {
+	char *filename;
+	size_t fsize = 0;
 
-	// TODO: add encoding
+	filename = buf + 10;
 
-	if ((fp = fopen(filename, "r")) == NULL) {
-		perror("fopen()");
-		return 1;
+	/* send download message */
+	if (send(sfd, buf, strlen(buf), 0) == -1) {
+		perror("send()");
+		return -1;
 	}
 
-	if ((buf = malloc(BUFSIZE)) == NULL) {
-		perror("malloc()");
-		fclose(fp);
-		return 2;
+	/* either it wasn't there or we get back the filesize */
+	if ((recv_success(sfd, "File not available on server, try $VIEW$")) < 0)
+		return -2;
+
+	/* tell server we're ready to accept size */
+	if (send(sfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
+		perror("send()");
+		return -3;
 	}
 
-	while (bytes > 0) {
-
-		toWrite = min(BUFSIZE, bytes);
-
-		bytesRead = fread(buf, 1, toWrite, fp);
-		if (ferror(fp)) {
-			perror("fread()");
-			ret = 3;
-			goto cleanup;
-		}
-
-		if (bytesRead != toWrite) {
-			fprintf(stderr, "Error: file read mismatch!");
-			ret = 4;
-			goto cleanup;
-		}
-
-		if (send(cfd, buf, bytesRead, 0) == -1) {
-			perror("send()");
-			ret = 5;
-			goto cleanup;
-		}
-
-		bytes -= bytesRead;
-	}
-
-cleanup:
-	free(buf);
-	fclose(fp);
-	return ret;
-}
-
-int recv_success(int sfd, char *errMsg) {
-	char msg[BUFSIZE];
-
-	if (recv(sfd, msg, sizeof(msg), 0) == -1) {
+	/* recv size */
+	if (recv(sfd, &fsize, sizeof(fsize), 0) == -1) {
 		perror("recv()");
 		return -4;
 	}
 
-	if (!(strncmp(msg, SUCCESS_MSG, sizeof(SUCCESS_MSG)) == 0)) {
-		fprintf(stderr, "%s\n", errMsg);
+	/* download file */
+	if (download(filename, fsize, sfd) != 0) {
+		fprintf(stderr, "download()\n");
 		return -5;
 	}
 
@@ -139,6 +111,7 @@ int client_wrap_upload(int sfd, char *buf) {
 		}
 	}
 
+	/* FIXME */
 	filename = strtok(filepath, "/");
 	if ((filename = strtok(filepath, "/")) != NULL) {
 		do {
@@ -159,35 +132,25 @@ int client_wrap_upload(int sfd, char *buf) {
 	if ((recv_success(sfd, "Error: something went wrong!")) < 0)
 		return -2;
 
-	printf("MSG SENT, SENDING FILE SIZE\n");
-
 	/* send fsize */
 	fsize = fstat.st_size;
 	if (send(sfd, &fsize, sizeof(fsize), 0) == -1) {
 		perror("send()");
 		return -3;
 	}
-	printf("FSIZE: %ld\n", fsize);
-
-	printf("FILE SIZE SENT\n");
 
 	if ((recv_success(sfd, "Error: Not enough space available!")) < 0)
 		return -4;
 
-	printf("SPACE AVLBL, UPLOADING\n");
-
-	if (client_upload(saveFilename, fsize, sfd) < 0) {
+	if (upload(saveFilename, fsize, sfd) < 0) {
 		perror("upload()");
 		return -5;
 	}
-
-	printf("CLIENT UPLOADING COMPLETE\n");
 
 	if ((recv_success(sfd, "Error: something went wrong!")) < 0)
 		return -4;
 
 	printf(COL_GREEN "File uploaded to server successfully!\n" COL_RESET);
-
 	return 0;
 }
 

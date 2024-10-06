@@ -102,3 +102,124 @@ int identify_request(char *buf) {
 		return 3;
 	return -1;
 }
+
+/**
+ * @brief download a total of 'bytes' bytes from a socket, into
+ * `filename` file
+ */
+int download(char *filename, size_t bytes, int sfd) {
+	FILE *fp;
+	int bytesRead, toRead, ret = 0;
+	char *buf;
+
+	if ((fp = fopen(filename, "w")) == NULL) {
+		perror("fopen()");
+		return 1;
+	}
+
+	if ((buf = malloc(BUFSIZE)) == NULL) {
+		perror("malloc()");
+		ret = 2;
+		goto cleanup;
+	}
+
+	while (bytes > 0) {
+
+		toRead = min(BUFSIZE, bytes);
+
+		if ((bytesRead = recv(sfd, buf, toRead, 0)) == -1) {
+			perror("recv()");
+			ret = 3;
+			goto cleanup;
+		}
+
+		if (bytesRead != toRead) {
+			fprintf(stderr, "Error: socket read mismatch!\n");
+			ret = 4;
+			goto cleanup;
+		}
+
+		fwrite(buf, bytesRead, 1, fp);
+		if (ferror(fp)) {
+			perror("fwrite()");
+			ret = 5;
+			goto cleanup;
+		}
+
+		bytes -= toRead;
+	}
+
+cleanup:
+	free(buf);
+	fclose(fp);
+	return ret;
+}
+
+/**
+ * @brief upload `bytes` bytes, from `filename` file, to the socket
+ *
+ * @note the file's existence must be guaranteed before calling this function
+ */
+int upload(char *filename, size_t bytes, int sfd) {
+	FILE *fp;
+	int bytesRead, toWrite, ret = 0;
+	char *buf;
+
+	if ((fp = fopen(filename, "r")) == NULL) {
+		perror("fopen()");
+		return 1;
+	}
+
+	if ((buf = malloc(BUFSIZE)) == NULL) {
+		perror("malloc()");
+		fclose(fp);
+		return 2;
+	}
+
+	while (bytes > 0) {
+
+		toWrite = min(BUFSIZE, bytes);
+
+		bytesRead = fread(buf, 1, toWrite, fp);
+		if (ferror(fp)) {
+			perror("fread()");
+			ret = 3;
+			goto cleanup;
+		}
+
+		if (bytesRead != toWrite) {
+			fprintf(stderr, "Error: file read mismatch!");
+			ret = 4;
+			goto cleanup;
+		}
+
+		if (send(sfd, buf, bytesRead, 0) == -1) {
+			perror("send()");
+			ret = 5;
+			goto cleanup;
+		}
+
+		bytes -= bytesRead;
+	}
+
+cleanup:
+	free(buf);
+	fclose(fp);
+	return ret;
+}
+
+int recv_success(int sfd, char *errMsg) {
+	char msg[BUFSIZE];
+
+	if (recv(sfd, msg, sizeof(msg), 0) == -1) {
+		perror("recv()");
+		return -4;
+	}
+
+	if (!(strncmp(msg, SUCCESS_MSG, sizeof(SUCCESS_MSG)) == 0)) {
+		fprintf(stderr, "%s\n", errMsg);
+		return -5;
+	}
+
+	return 0;
+}

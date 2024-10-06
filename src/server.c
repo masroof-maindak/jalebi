@@ -12,6 +12,53 @@
 #include "../include/server.h"
 #include "../include/utils.h"
 
+int main() {
+	if (ensure_srv_dir_exists() != 0) {
+		fprintf(stderr,
+				"Unable to find or generate server directory, exiting\n");
+		return 1;
+	}
+
+	int sfd, cfd, ret = 0;
+	struct sockaddr_in saddr, caddr;
+	socklen_t addrSize = sizeof(caddr);
+	pthread_t clientThread;
+
+	printf("Listening on port %d...\n", SERVER_PORT);
+
+	if ((sfd = init_server_socket(&saddr)) < 0)
+		return 2;
+
+	for (;;) {
+
+		if ((cfd = accept(sfd, (struct sockaddr *)&caddr, &addrSize)) == -1) {
+			perror("accept()");
+			ret = 3;
+			goto cleanup;
+		}
+
+		if (pthread_create(&clientThread, NULL, handle_client, &cfd) != 0) {
+			perror("pthread_create()");
+			ret = 4;
+			goto cleanup;
+		}
+
+		if (pthread_detach(clientThread) != 0) {
+			perror("pthread_detach()");
+			ret = 5;
+			goto cleanup;
+		}
+	}
+
+cleanup:
+	if ((close(sfd)) == -1) {
+		perror("close(sfd)");
+		ret = 6;
+	}
+
+	return ret;
+}
+
 void *handle_client(void *arg) {
 	int cfd, reqType, status;
 	ssize_t bytesRead;
@@ -30,8 +77,6 @@ void *handle_client(void *arg) {
 			perror("recv()");
 			goto cleanup;
 		}
-
-		printf("CLIENT SENT: %s\n", buf);
 
 		if (bytesRead == 0) {
 			printf("Client has closed the socket!\n");
@@ -70,49 +115,6 @@ cleanup:
 	pthread_exit(NULL);
 }
 
-int main() {
-	ensure_srv_dir_exists();
-
-	int sfd, cfd, ret = 0;
-	struct sockaddr_in saddr, caddr;
-	socklen_t addrSize = sizeof(caddr);
-	pthread_t clientThread;
-
-	printf("Listening on port %d...\n", SERVER_PORT);
-
-	if ((sfd = init_server_socket(&saddr)) < 0)
-		return 1;
-
-	for (;;) {
-
-		if ((cfd = accept(sfd, (struct sockaddr *)&caddr, &addrSize)) == -1) {
-			perror("accept()");
-			ret = 2;
-			goto cleanup;
-		}
-
-		if (pthread_create(&clientThread, NULL, handle_client, &cfd) != 0) {
-			perror("pthread_create()");
-			ret = 3;
-			goto cleanup;
-		}
-
-		if (pthread_detach(clientThread) != 0) {
-			perror("pthread_detach()");
-			ret = 4;
-			goto cleanup;
-		}
-	}
-
-cleanup:
-	if ((close(sfd)) == -1) {
-		perror("close(sfd)");
-		ret = 5;
-	}
-
-	return ret;
-}
-
 int init_server_socket(struct sockaddr_in *saddr) {
 	int sfd, reuse = 1;
 
@@ -146,97 +148,48 @@ int init_server_socket(struct sockaddr_in *saddr) {
 }
 
 /**
- * @brief upload `bytes` bytes, from `filename` file, to the client's socket
- *
- * @note the file's existence must be guaranteed before calling this function
- */
-int serv_upload(char *filename, size_t bytes, int cfd) {
-	int bytesRead, toWrite, ret = 0;
-	FILE *fp;
-	char *buf;
-
-	if ((fp = fopen(filename, "r")) == NULL) {
-		perror("fopen()");
-		return 1;
-	}
-
-	if ((buf = malloc(BUFSIZE)) == NULL) {
-		perror("malloc()");
-		fclose(fp);
-		return 2;
-	}
-
-	while (bytes > 0) {
-
-		toWrite = min(BUFSIZE, bytes);
-
-		bytesRead = fread(buf, 1, toWrite, fp);
-		if (ferror(fp)) {
-			perror("fread()");
-			ret = 3;
-			goto cleanup;
-		}
-
-		if (bytesRead != toWrite) {
-			fprintf(stderr, "Error: file read mismatch!");
-			ret = 4;
-			goto cleanup;
-		}
-
-		if (send(cfd, buf, bytesRead, 0) == -1) {
-			perror("send()");
-			ret = 5;
-			goto cleanup;
-		}
-
-		bytes -= bytesRead;
-	}
-
-cleanup:
-	free(buf);
-	fclose(fp);
-	return ret;
-}
-
-/**
  * @details This function is called when the user opts to DOWNLOAD a file.
- * 	- we must check if the file exists inside HOSTDIR
- * 	- If not, send back $FAILURE$FILE_NOT_FOUND$
- * 	- Else, query that file for it's size, and send() it back
- * 	- Call serv_upload function to send() file until nothing remains
+ * 	- Check if the file exists inside HOSTDIR
+ * 	- If not, send() back $FAILURE$FILE_NOT_FOUND$, else send $SUCCESS$
+ * 	- recv() acknowledgement
+ * 	- Else, send() back it's size
+ * 	- Call upload function to send() file until nothing remains
  *
  * @param[buf] the buffer containing the request $DOWNLOAD$<filename>$
  */
 int serv_wrap_upload(int cfd, char *buf) {
-	int fsize;
-	char *filename, path[BUFSIZE >> 1];
+	size_t fsize;
+	char *filename, filepath[BUFSIZE >> 1];
 	struct stat st;
 
-	filename = buf + 9;
+	filename = buf + 10;
+	snprintf(filepath, sizeof(filepath), HOSTDIR "/%s", filename);
 
-	/* TODO: verify_upload_input */
-
-	snprintf(path, sizeof(path), HOSTDIR "/%s", filename);
-
-	/* file not found */
-	if (stat(path, &st) != 0) {
+	if (stat(filepath, &st) != 0) {
 		if (send(cfd, DLOAD_FAILURE_MSG, sizeof(DLOAD_FAILURE_MSG), 0) == -1) {
 			perror("send()");
-			return -3;
+			return -1;
 		}
-		return -2;
+		return 0;
+	} else {
+		if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
+			perror("send()");
+			return -2;
+		}
 	}
 
-	/* send fsize */
+	/* TODO: timeout if no response for a while */
+	if ((recv_success(cfd, "Client never acknowledged receive")) < 0)
+		return -3;
+
 	fsize = st.st_size;
-	if (send(cfd, &fsize, sizeof(int), 0) == -1) {
+	if (send(cfd, &fsize, sizeof(fsize), 0) == -1) {
 		perror("send()");
 		return -4;
 	}
 
-	/* upload file */
-	if (serv_upload(filename, fsize, cfd) < 0) {
-		perror("upload()");
+	if (upload(filepath, fsize, cfd) < 0) {
+		fprintf(stderr, "upload()\n");
 		return -5;
 	}
 
@@ -245,36 +198,34 @@ int serv_wrap_upload(int cfd, char *buf) {
 
 /**
  * @details This function is called when the user opts to UPLOAD a file.
- * 	- Receiving the file's total size from the client
- * 	- Checking if there is enough space in the HOSTDIR to accomodate this file
- * 	- If not, sending back $FAILURE$LOW_SPACE$
- * 	- If yes, sending back $SUCCESS$
- * 	- Calling the main download function (serv_download) using the `bytes`
+ * 	- Sends back SUCCESS after determining the request type
+ * 	- Receives the file's total size from the client
+ * 	- Checks if there is enough space in the HOSTDIR to accomodate this file
+ * 	- If not, sends back $FAILURE$LOW_SPACE$
+ * 	- If yes, sends back $SUCCESS$
+ * 	- Calls the main download function (download) using the `bytes`
  * 	  acquired from #2
- * 	- Sending $SUCCESS$ again
+ * 	- Sends $SUCCESS$ again
  *
  * @param[buf] the buffer containing the request $UPLOAD$<filename>$
  */
 int serv_wrap_download(int cfd, char *buf) {
 	size_t fsize;
-	char *filename;
+	char *filename, filepath[BUFSIZE << 1];
 	__off_t usedSpace;
-
-	printf("ENTERED DOWNLOAD WRAPPER\n");
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send()");
 		return -2;
 	}
 
+	/* TODO: error handling? */
 	filename = buf + 8;
 
 	if (recv(cfd, &fsize, sizeof(fsize), 0) == -1) {
 		perror("recv()");
 		return -3;
 	}
-
-	printf("RECEIVED FILE SIZE\n");
 
 	if ((usedSpace = get_used_space(HOSTDIR)) + fsize > MAX_CLIENT_SPACE) {
 		if (send(cfd, ULOAD_FAILURE_MSG, sizeof(ULOAD_FAILURE_MSG), 0) == -1) {
@@ -283,6 +234,7 @@ int serv_wrap_download(int cfd, char *buf) {
 		}
 		return 4;
 	} else if (usedSpace < 0) {
+		fprintf(stderr, "Couldn't query available space!\n");
 		if (send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0) == -1) {
 			perror("send()");
 			return -5;
@@ -290,21 +242,16 @@ int serv_wrap_download(int cfd, char *buf) {
 		return -4;
 	}
 
-	printf("SPACE AVAILABLE\n");
-
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send()");
 		return -5;
 	}
 
-	printf("SPACE SUCCESS MSG SENT\n");
-
-	if (serv_download(filename, fsize, cfd) != 0) {
-		fprintf(stderr, "serv_download()\n");
+	snprintf(filepath, sizeof(filepath), HOSTDIR "/%s", filename);
+	if (download(filepath, fsize, cfd) != 0) {
+		fprintf(stderr, "download()\n");
 		return -6;
 	}
-
-	printf("DOWNLOAD COMPLETE\n");
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send()");
@@ -312,60 +259,6 @@ int serv_wrap_download(int cfd, char *buf) {
 	}
 
 	return 0;
-}
-
-/**
- * @brief download a total of 'bytes' bytes from a client, into
- * `filename` file
- */
-int serv_download(char *filename, size_t bytes, int cfd) {
-	FILE *fp;
-	int bytesRead, toRead, ret = 0;
-	char *buf, filepath[BUFSIZE << 1];
-
-	snprintf(filepath, sizeof(filepath), HOSTDIR "/%s", filename);
-
-	if ((fp = fopen(filepath, "w")) == NULL) {
-		perror("fopen()");
-		return 1;
-	}
-
-	if ((buf = malloc(BUFSIZE)) == NULL) {
-		perror("malloc()");
-		ret = 2;
-		goto cleanup;
-	}
-
-	while (bytes > 0) {
-
-		toRead = min(BUFSIZE, bytes);
-
-		if ((bytesRead = recv(cfd, buf, toRead, 0)) == -1) {
-			perror("recv()");
-			ret = 3;
-			goto cleanup;
-		}
-
-		if (bytesRead != toRead) {
-			fprintf(stderr, "Error: socket read mismatch!\n");
-			ret = 4;
-			goto cleanup;
-		}
-
-		fwrite(buf, bytesRead, 1, fp);
-		if (ferror(fp)) {
-			perror("fwrite()");
-			ret = 5;
-			goto cleanup;
-		}
-
-		bytes -= toRead;
-	}
-
-cleanup:
-	free(buf);
-	fclose(fp);
-	return ret;
 }
 
 int serv_wrap_view(int cfd) {
@@ -413,14 +306,15 @@ cleanup:
 	return status;
 }
 
-void ensure_srv_dir_exists() {
+int ensure_srv_dir_exists() {
 	struct stat st = {0};
 	if (stat(HOSTDIR, &st) == -1) {
 		if (mkdir(HOSTDIR, 0700) == -1) {
 			perror("mkdir()");
-			return;
+			return 1;
 		}
 	}
+	return 0;
 }
 
 __off_t get_used_space(const char *dir) {

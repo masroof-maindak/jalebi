@@ -6,12 +6,10 @@
 #define MAXCLIENTS		 4
 #define MAX_CLIENT_SPACE 10 * 1024 * 1024
 
+void *handle_client(void *arg);
 int init_server_socket(struct sockaddr_in *saddr);
-void ensure_srv_dir_exists();
+int ensure_srv_dir_exists();
 __off_t get_used_space(const char *dir);
-
-int serv_download(char *filename, size_t bytes, int cfd);
-int serv_upload(char *filename, size_t bytes, int cfd);
 
 int serv_wrap_view(int cfd);
 int serv_wrap_upload(int cfd, char *buf);
