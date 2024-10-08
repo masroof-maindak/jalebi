@@ -329,7 +329,7 @@ __off_t get_used_space(const char *dir) {
 	}
 
 	while ((entry = readdir(d)) != NULL) {
-		if (!strcmp(entry->d_name, ".") || strcmp(entry->d_name, "..") == 0)
+		if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
 			continue;
 
 		snprintf(filepath, sizeof(filepath), "%s/%s", dir, entry->d_name);
