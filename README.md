@@ -15,4 +15,5 @@
     - [ ] function pointer-ed upload and download logic
 - [ ] Use an ENUM for `reqType`
 - [ ] Get rid of readline
-- [ ] Use the [ restrict ] keyword where suitable
+- [ ] Use const/restrict keywords where applicable
+- [ ] close() -> shutdown() for sockets
