@@ -93,13 +93,13 @@ cleanup:
 	return idx;
 }
 
-int identify_request(char *buf) {
+enum REQUEST identify_request(char *buf) {
 	if (!strncmp(buf, "$VIEW$", 6))
-		return 1;
+		return VIEW;
 	else if (!strncmp(buf, "$DOWNLOAD$", 10))
-		return 2;
+		return DOWNLOAD;
 	else if (!strncmp(buf, "$UPLOAD$", 8))
-		return 3;
+		return UPLOAD;
 	return -1;
 }
 

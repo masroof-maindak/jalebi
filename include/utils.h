@@ -24,8 +24,10 @@
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
+enum REQUEST { VIEW = 1, DOWNLOAD, UPLOAD, INVALID };
+
 char *copy_string(const char *str);
-int identify_request(char *buf);
+enum REQUEST identify_request(char *buf);
 int recv_success(int sfd, char *errMsg);
 ssize_t view(char *buf, size_t size);
 

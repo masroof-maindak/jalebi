@@ -60,7 +60,8 @@ cleanup:
 }
 
 void *handle_client(void *arg) {
-	int cfd, reqType, status;
+	int cfd, status;
+	enum REQUEST reqType;
 	ssize_t bytesRead;
 	char *buf;
 
@@ -86,13 +87,13 @@ void *handle_client(void *arg) {
 		reqType = identify_request(buf);
 
 		switch (reqType) {
-		case 1: /* $VIEW$ */
+		case VIEW:
 			status = serv_wrap_view(cfd);
 			break;
-		case 2: /* $DOWNLOAD$<filename>$ */
+		case DOWNLOAD:
 			status = serv_wrap_upload(cfd, buf);
 			break;
-		case 3: /* $UPLOAD$<filename>$ */
+		case UPLOAD:
 			status = serv_wrap_download(cfd, buf);
 			break;
 		default:

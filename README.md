@@ -13,7 +13,6 @@
 - [ ] encoding/decoding
     - [ ] use an algorithm that guarantees a smaller result
     - [ ] function pointer-ed upload and download logic
-- [ ] Use an ENUM for `reqType`
 - [ ] Get rid of readline
 - [ ] Use const/restrict keywords where applicable
 - [ ] close() -> shutdown() for sockets

@@ -11,11 +11,11 @@
 #include <readline/readline.h>
 
 #include "../include/client.h"
-#include "../include/utils.h"
 
 int main() {
 	signal(SIGINT, SIG_IGN);
-	int sfd, reqType, status = 0;
+	int sfd, status = 0;
+	enum REQUEST reqType;
 	struct sockaddr_in saddr;
 	char *userInput = NULL;
 
@@ -226,7 +226,7 @@ int init_client_socket(struct sockaddr_in *saddr) {
 	return sfd;
 }
 
-int handle_input(char *userInput) {
+enum REQUEST handle_input(char *userInput) {
 	size_t len	= strlen(userInput);
 	int reqType = -1;
 
@@ -249,18 +249,20 @@ int handle_input(char *userInput) {
 	return reqType;
 }
 
-uint8_t valid_user_input(const char *input, int reqType, size_t len) {
+uint8_t valid_user_input(const char *input, enum REQUEST reqType, size_t len) {
 	switch (reqType) {
-	case 1:
+	case VIEW:
 		return input[6] == '\0';
 		break;
-	case 2:
+	case DOWNLOAD:
 		if (input[len - 1] == '$' && len > 11 && input[10] != '$')
 			return 1;
 		break;
-	case 3:
+	case UPLOAD:
 		if (input[len - 1] == '$' && len > 9 && input[8] != '$')
 			return 1;
+		break;
+	case INVALID:
 		break;
 	}
 
