@@ -1,5 +1,6 @@
 #include <arpa/inet.h>
 #include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,110 +14,6 @@
 #include "../include/bool.h"
 #include "../include/client.h"
 
-char select_mode() {
-	int c, x, ctr;
-
-	do {
-		ctr = 0;
-		printf("[L]ogin/[R]egister? ");
-		c = getchar();
-
-		/* clean stdin */
-		while ((x = getchar()) != '\n' && x != EOF)
-			ctr++;
-
-	} while (ctr > 0 || (c != 'L' && c != 'R'));
-
-	return c;
-}
-
-/**
- * @brief registers user w/ server; returns 0 on success
- */
-int user_registration(int sfd) {
-	char *un = NULL, *pw = NULL;
-	char buf[64];
-	bool unSuccess = false, pwSuccess = false;
-	uint8_t unLen = 0, pwLen = 0, ret = 0;
-	ssize_t written;
-
-	if ((pw = malloc(PW_MAX_LEN + 1)) == NULL)
-		return -1;
-
-	/* get username */
-	while (!unSuccess) {
-		un		  = readline("Username: ");
-		unLen	  = strlen(un);
-		unSuccess = unLen >= PW_MIN_LEN && unLen <= PW_MAX_LEN;
-		if (!unSuccess)
-			free(un);
-	}
-
-	/* get password */
-	while (!pwSuccess) {
-		if (NULL ==
-			readpassphrase("Password: ", pw, sizeof(pw), RPP_REQUIRE_TTY)) {
-			goto cleanup;
-			return -2;
-		}
-
-		pwLen	  = strlen(pw);
-		pwSuccess = pwLen >= PW_MIN_LEN && pwLen <= PW_MAX_LEN;
-	}
-
-	/* format server message */
-	if ((written = snprintf(buf, sizeof(buf), "%c%d%d%s%s", 'R', unLen, pwLen, un,
-							pw)) < 0) {
-		ret = -3;
-		goto cleanup;
-	}
-
-	/* send to server */
-	if (send(sfd, buf, written, 0) == -1) {
-		perror("send()");
-		ret = -4;
-		goto cleanup;
-	}
-
-	if ((recv_success(sfd, "Error: server couldn't register!")) < 0)
-		ret = -5;
-
-cleanup:
-	free(un);
-	free(pw);
-	return ret;
-}
-
-/**
- * @brief tries to log in thrice before exiting; returns 0 on success
- */
-int user_login(int sfd) {
-	/* int attempts   = 0; */
-	/* bool userGiven = false; */
-
-	/* get username */
-	/* get password */
-	/* send both */
-	/* recv_success */
-
-	return 0;
-}
-
-int user_auth(int sfd) {
-	char opt = select_mode();
-
-	switch (opt) {
-	case 'L':
-		return user_login(sfd);
-	case 'R':
-		return user_registration(sfd);
-	default:
-		break;
-	}
-
-	return -1;
-}
-
 int main() {
 	int sfd, status = 0;
 	enum REQUEST reqType;
@@ -126,10 +23,10 @@ int main() {
 	if ((sfd = init_client_socket(&saddr)) < 0)
 		return 1;
 
-	printf("%sSuccesfully connected to server -- %s:%d%s\n", COL_GREEN,
-		   SERVER_IP, SERVER_PORT, COL_RESET);
+	printf(COL_GREEN "Succesfully connected to server -- %s:%d\n" COL_RESET,
+		   SERVER_IP, SERVER_PORT);
 
-	status = user_auth(sfd);
+	status = user_authorisation(sfd);
 
 	while (status == 0) {
 		userInput = readline("namak-paare > ");
@@ -161,6 +58,103 @@ int main() {
 	close(sfd);
 	return 0;
 }
+
+char select_mode() {
+	int c, x, ctr;
+
+	do {
+		ctr = 0;
+		printf("[L]ogin/[R]egister? ");
+		c = getchar();
+		/* clean stdin */
+		while ((x = getchar()) != '\n' && x != EOF)
+			ctr++;
+	} while (ctr > 0 || (c != 'L' && c != 'R'));
+
+	return c;
+}
+
+char *get_password(char *pw, uint8_t *pwLen) {
+	bool pwSuccess = false;
+	char *tmp	   = NULL;
+
+	while (!pwSuccess) {
+		if ((tmp = readpassphrase("Password: ", pw, sizeof(pw),
+								  RPP_REQUIRE_TTY)) == NULL) {
+			return NULL;
+		}
+
+		*pwLen	  = strlen(pw);
+		pwSuccess = *pwLen >= PW_MIN_LEN && *pwLen <= PW_MAX_LEN;
+	}
+
+	return pw;
+}
+
+char *get_username(char *un, uint8_t *unLen) {
+	bool unSuccess = false;
+
+	while (!unSuccess) {
+		if ((un = readline("Username: ")) == NULL)
+			continue;
+
+		*unLen	  = strlen(un);
+		unSuccess = *unLen >= PW_MIN_LEN && *unLen <= PW_MAX_LEN;
+		if (!unSuccess)
+			free(un);
+	}
+
+	return un;
+}
+
+int send_auth_info(int sfd, char mode, const char *pw, const char *un,
+				   uint8_t unLen, uint8_t pwLen) {
+	char buf[64];
+	ssize_t written;
+
+	if ((written = snprintf(buf, sizeof(buf), "%c%d%d%s%s", mode, unLen, pwLen,
+							un, pw)) < 0) {
+		return -1;
+	}
+
+	if (send(sfd, buf, written, 0) == -1) {
+		perror("send()");
+		return -2;
+	}
+
+	return 0;
+}
+
+/**
+ * @brief register OR log-in user w/ server; returns 0 on success
+ */
+int user_authorisation(int sfd) {
+	char *un = NULL, *pw = NULL, opt = select_mode();
+	uint8_t unLen = 0, pwLen = 0, ret = 0;
+
+	if ((pw = malloc(PW_MAX_LEN + 1)) == NULL)
+		return -1;
+
+	un = get_username(un, &unLen);
+	if ((pw = get_password(pw, &pwLen)) == NULL) {
+		ret = -2;
+		goto cleanup;
+	}
+
+	if (send_auth_info(sfd, opt, pw, un, unLen, pwLen) != 0) {
+		ret = -3;
+		goto cleanup;
+	}
+
+	if ((recv_success(sfd, "Error: couldn't authorise!")) < 0)
+		ret = -4;
+
+cleanup:
+	free(un);
+	free(pw);
+	return ret;
+}
+
 
 int client_wrap_download(int sfd, char *buf) {
 	char *filename;

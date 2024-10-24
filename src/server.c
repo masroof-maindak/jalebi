@@ -60,7 +60,7 @@ cleanup:
 }
 
 void *handle_client(void *arg) {
-	int cfd, status, attempts = 0;
+	int cfd, status;
 	enum REQUEST reqType;
 	ssize_t bytesRead;
 	char *buf;
@@ -70,6 +70,8 @@ void *handle_client(void *arg) {
 		perror("malloc()");
 		pthread_exit(NULL);
 	}
+
+	/* TODO: handle login/register */
 
 	cfd	   = *(int *)arg;
 	status = 0;
