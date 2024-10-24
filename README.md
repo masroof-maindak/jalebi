@@ -1,8 +1,7 @@
 # Jalebi
 
 ### TODO
-- [x] Client-side download
-- [x] fix `strtok` in client.c
+
 - [/] auth.h/.c - login/register
     - [x] SQLite integration
     - [/] thread-local userid
