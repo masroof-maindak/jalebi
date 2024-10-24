@@ -7,9 +7,6 @@
     - [x] SQLite integration
     - [/] thread-local userid
     - [ ] Replace all uses of `HOSTDIR` w/ `HOSTDIR/userid`
-- [/] Client
-    - [x] register
-    - [ ] login
 - [ ] queue.h/.c
     - [ ] server-side handler thread
     - [ ] reader/writer threads depending on userid
