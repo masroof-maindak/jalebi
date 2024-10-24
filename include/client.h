@@ -9,6 +9,8 @@
 #define SERVER_IP		 "127.0.0.1"
 #define USER_INPUT_LIMIT 128
 #define RESPONSE_LIMIT	 128
+#define PW_MAX_LEN		 30
+#define PW_MIN_LEN		 4
 
 enum REQUEST handle_input(char *userInput);
 int init_client_socket(struct sockaddr_in *saddr);

@@ -60,10 +60,11 @@ cleanup:
 }
 
 void *handle_client(void *arg) {
-	int cfd, status;
+	int cfd, status, attempts = 0;
 	enum REQUEST reqType;
 	ssize_t bytesRead;
 	char *buf;
+	unsigned long uid = -1;
 
 	if ((buf = malloc(BUFSIZE)) == NULL) {
 		perror("malloc()");
@@ -158,7 +159,7 @@ int init_server_socket(struct sockaddr_in *saddr) {
  *
  * @param[buf] the buffer containing the request $DOWNLOAD$<filename>$
  */
-int serv_wrap_upload(int cfd, char *buf) {
+int serv_wrap_upload(const int cfd, char *buf) {
 	size_t fsize;
 	char *filename, filepath[BUFSIZE >> 1];
 	struct stat st;
@@ -210,7 +211,7 @@ int serv_wrap_upload(int cfd, char *buf) {
  *
  * @param[buf] the buffer containing the request $UPLOAD$<filename>$
  */
-int serv_wrap_download(int cfd, char *buf) {
+int serv_wrap_download(const int cfd, char *buf) {
 	size_t fsize;
 	char *filename, filepath[BUFSIZE << 1];
 	__off_t usedSpace;
@@ -320,7 +321,7 @@ int ensure_srv_dir_exists() {
 __off_t get_used_space(const char *dir) {
 	struct dirent *entry;
 	struct stat st;
-	char filepath[BUFSIZE];
+	char fpath[BUFSIZE];
 	int size = 0;
 	DIR *d;
 
@@ -333,11 +334,15 @@ __off_t get_used_space(const char *dir) {
 		if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
 			continue;
 
-		snprintf(filepath, sizeof(filepath), "%s/%s", dir, entry->d_name);
-		if (stat(filepath, &st) == -1) {
-			perror("stat()");
+		if (snprintf(fpath, sizeof(fpath), "%s/%s", dir, entry->d_name) < 0) {
 			closedir(d);
 			return -2;
+		}
+
+		if (stat(fpath, &st) == -1) {
+			perror("stat()");
+			closedir(d);
+			return -3;
 		}
 
 		size += st.st_size;

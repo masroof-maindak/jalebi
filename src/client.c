@@ -1,6 +1,5 @@
 #include <arpa/inet.h>
 #include <errno.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,12 +7,117 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <bsd/readpassphrase.h>
 #include <readline/readline.h>
 
+#include "../include/bool.h"
 #include "../include/client.h"
 
+char select_mode() {
+	int c, x, ctr;
+
+	do {
+		ctr = 0;
+		printf("[L]ogin/[R]egister? ");
+		c = getchar();
+
+		/* clean stdin */
+		while ((x = getchar()) != '\n' && x != EOF)
+			ctr++;
+
+	} while (ctr > 0 || (c != 'L' && c != 'R'));
+
+	return c;
+}
+
+/**
+ * @brief registers user w/ server; returns 0 on success
+ */
+int user_registration(int sfd) {
+	char *un = NULL, *pw = NULL;
+	char buf[64];
+	bool unSuccess = false, pwSuccess = false;
+	uint8_t unLen = 0, pwLen = 0, ret = 0;
+	ssize_t written;
+
+	if ((pw = malloc(PW_MAX_LEN + 1)) == NULL)
+		return -1;
+
+	/* get username */
+	while (!unSuccess) {
+		un		  = readline("Username: ");
+		unLen	  = strlen(un);
+		unSuccess = unLen >= PW_MIN_LEN && unLen <= PW_MAX_LEN;
+		if (!unSuccess)
+			free(un);
+	}
+
+	/* get password */
+	while (!pwSuccess) {
+		if (NULL ==
+			readpassphrase("Password: ", pw, sizeof(pw), RPP_REQUIRE_TTY)) {
+			goto cleanup;
+			return -2;
+		}
+
+		pwLen	  = strlen(pw);
+		pwSuccess = pwLen >= PW_MIN_LEN && pwLen <= PW_MAX_LEN;
+	}
+
+	/* format server message */
+	if ((written = snprintf(buf, sizeof(buf), "%c%d%d%s%s", 'R', unLen, pwLen, un,
+							pw)) < 0) {
+		ret = -3;
+		goto cleanup;
+	}
+
+	/* send to server */
+	if (send(sfd, buf, written, 0) == -1) {
+		perror("send()");
+		ret = -4;
+		goto cleanup;
+	}
+
+	if ((recv_success(sfd, "Error: server couldn't register!")) < 0)
+		ret = -5;
+
+cleanup:
+	free(un);
+	free(pw);
+	return ret;
+}
+
+/**
+ * @brief tries to log in thrice before exiting; returns 0 on success
+ */
+int user_login(int sfd) {
+	/* int attempts   = 0; */
+	/* bool userGiven = false; */
+
+	/* get username */
+	/* get password */
+	/* send both */
+	/* recv_success */
+
+	return 0;
+}
+
+int user_auth(int sfd) {
+	char opt = select_mode();
+
+	switch (opt) {
+	case 'L':
+		return user_login(sfd);
+	case 'R':
+		return user_registration(sfd);
+	default:
+		break;
+	}
+
+	return -1;
+}
+
 int main() {
-	signal(SIGINT, SIG_IGN);
 	int sfd, status = 0;
 	enum REQUEST reqType;
 	struct sockaddr_in saddr;
@@ -25,7 +129,7 @@ int main() {
 	printf("%sSuccesfully connected to server -- %s:%d%s\n", COL_GREEN,
 		   SERVER_IP, SERVER_PORT, COL_RESET);
 
-	/* TODO: login/registration... */
+	status = user_auth(sfd);
 
 	while (status == 0) {
 		userInput = readline("namak-paare > ");
@@ -34,13 +138,13 @@ int main() {
 			continue;
 
 		switch (reqType) {
-		case 1: /* $VIEW$\n */
+		case VIEW:
 			status = client_wrap_view(sfd);
 			break;
-		case 2: /* $DOWNLOAD$<filename>$\n */
+		case DOWNLOAD:
 			status = client_wrap_download(sfd, userInput);
 			break;
-		case 3: /* $UPLOAD$<filename>$\n */
+		case UPLOAD:
 			status = client_wrap_upload(sfd, userInput);
 			break;
 		case 4:
@@ -127,40 +231,43 @@ char *extract_filename_if_exists(const char *fpath, struct stat *fstat) {
 int client_wrap_upload(int sfd, char *buf) {
 	char *filepath = buf + 8, *filename = NULL, msg[BUFSIZE];
 	struct stat fstat;
-	size_t fsize = 0, written;
+	size_t fsize = 0;
+	ssize_t written;
 
 	if ((filename = extract_filename_if_exists(filepath, &fstat)) == NULL)
 		return -1;
 
 	/* send upload message */
-	written = snprintf(msg, sizeof(msg), "$UPLOAD$%s", filename);
+	if ((written = snprintf(msg, sizeof(msg), "$UPLOAD$%s", filename)) < 0)
+		return -2;
+
 	if (send(sfd, msg, written, 0) == -1) {
 		perror("send()");
-		return -2;
+		return -3;
 	}
 
 	free(filename);
 
 	if ((recv_success(sfd, "Error: something went wrong!")) < 0)
-		return -3;
+		return -4;
 
 	/* send fsize */
 	fsize = fstat.st_size;
 	if (send(sfd, &fsize, sizeof(fsize), 0) == -1) {
 		perror("send()");
-		return -4;
+		return -5;
 	}
 
 	if ((recv_success(sfd, "Error: Not enough space available!")) < 0)
-		return -5;
+		return -6;
 
 	if (upload(filepath, fsize, sfd) < 0) {
 		perror("upload()");
-		return -6;
+		return -7;
 	}
 
 	if ((recv_success(sfd, "Error: something went wrong!")) < 0)
-		return -7;
+		return -8;
 
 	printf(COL_GREEN "File uploaded to server successfully!\n" COL_RESET);
 	return 0;

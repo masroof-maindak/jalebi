@@ -5,14 +5,18 @@
 - [x] fix `strtok` in client.c
 - [/] auth.h/.c - login/register
     - [x] SQLite integration
-    - [ ] thread-local userid
+    - [/] thread-local userid
     - [ ] Replace all uses of `HOSTDIR` w/ `HOSTDIR/userid`
+- [/] Client
+    - [x] register
+    - [ ] login
 - [ ] queue.h/.c
     - [ ] server-side handler thread
     - [ ] reader/writer threads depending on userid
 - [ ] encoding/decoding
     - [ ] use an algorithm that guarantees a smaller result
     - [ ] function pointer-ed upload and download logic
-- [ ] Get rid of readline
+- [ ] snprintf checks
 - [ ] Use const/restrict keywords where applicable
-- [ ] close() -> shutdown() for sockets
+- [ ] close() -> shutdown() for sockets; should I?
+    - [ ] Relevant signal handlers

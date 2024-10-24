@@ -93,7 +93,7 @@ cleanup:
 	return idx;
 }
 
-enum REQUEST identify_request(char *buf) {
+enum REQUEST identify_request(const char *buf) {
 	if (!strncmp(buf, "$VIEW$", 6))
 		return VIEW;
 	else if (!strncmp(buf, "$DOWNLOAD$", 10))
@@ -107,7 +107,7 @@ enum REQUEST identify_request(char *buf) {
  * @brief download a total of 'bytes' bytes from a socket, into
  * `filename` file
  */
-int download(char *filename, size_t bytes, int sfd) {
+int download(const char *filename, size_t bytes, int sfd) {
 	FILE *fp;
 	int bytesRead, toRead, ret = 0;
 	char *buf;
@@ -160,7 +160,7 @@ cleanup:
  *
  * @note the file's existence must be guaranteed before calling this function
  */
-int upload(char *filename, size_t bytes, int sfd) {
+int upload(const char *filename, size_t bytes, int sfd) {
 	FILE *fp;
 	int bytesRead, toWrite, ret = 0;
 	char *buf;
@@ -208,16 +208,19 @@ cleanup:
 	return ret;
 }
 
-int recv_success(int sfd, char *err) {
+/**
+ *@brief return 0 if we `recv` '%SUCCESS' from the other side
+ */
+int recv_success(int sockfd, const char *err) {
 	char msg[BUFSIZE];
 
-	if (recv(sfd, msg, sizeof(msg), 0) == -1) {
+	if (recv(sockfd, msg, sizeof(msg), 0) == -1) {
 		perror("recv()");
 		return -1;
 	}
 
 	if (!(strncmp(msg, SUCCESS_MSG, sizeof(SUCCESS_MSG)) == 0)) {
-		fprintf(stderr, COL_RED "%s\n", err);
+		fprintf(stderr, COL_RED "%s\n" COL_RESET, err);
 		return -2;
 	}
 

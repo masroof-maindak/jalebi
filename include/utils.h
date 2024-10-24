@@ -27,14 +27,14 @@
 enum REQUEST { VIEW = 1, DOWNLOAD, UPLOAD, INVALID };
 
 char *copy_string(const char *str);
-enum REQUEST identify_request(char *buf);
-int recv_success(int sfd, char *errMsg);
+enum REQUEST identify_request(const char *buf);
+int recv_success(int sockfd, const char *err);
 ssize_t view(char *buf, size_t size);
 
 char *double_if_of(char *buf, size_t idx, size_t addition, size_t *size);
 
-int download(char *filename, size_t bytes, int sfd);
-/* TODO: take function pointer to encoder function */
-int upload(char *filename, size_t bytes, int sfd);
+/* TODO: take function pointer to encoder/decoder function */
+int download(const char *filename, size_t bytes, int sfd);
+int upload(const char *filename, size_t bytes, int sfd);
 
 #endif // UTILS_H
