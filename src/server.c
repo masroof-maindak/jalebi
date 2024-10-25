@@ -285,7 +285,7 @@ int serv_wrap_download(const int cfd, const char *buf) {
 	return 0;
 }
 
-int serv_wrap_view(int cfd) {
+int serv_wrap_view(int cfd, int uid) {
 	int status = 0;
 	ssize_t idx;
 	char *ret;
