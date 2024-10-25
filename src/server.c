@@ -18,7 +18,7 @@
 int get_uid(int cfd, char *buf) {
 	char mode, un[PW_MAX_LEN + 1], pw[PW_MAX_LEN + 1], *msg;
 	uint8_t unL, pwL;
-	int uid;
+	int uid = -1;
 
 	if (recv(cfd, buf, sizeof(buf), 0) == -1) {
 		perror("recv");
@@ -35,16 +35,9 @@ int get_uid(int cfd, char *buf) {
 	memcpy(pw, buf + 3 + unL, pwL);
 	un[unL] = pw[pwL] = '\0';
 
-	switch (mode) {
-	case 'L':
-		uid = verify_user(un, pw);
-		break;
-	case 'R':
-		uid = register_user(un, pw);
-		break;
-	}
-
+	uid = (mode == 'L') ? verify_user(un, pw) : register_user(un, pw);
 	msg = uid < 0 ? FAILURE_MSG : SUCCESS_MSG;
+	
 	if (send(cfd, msg, strlen(msg), 0) != 0) {
 		perror("send");
 		return -5;
