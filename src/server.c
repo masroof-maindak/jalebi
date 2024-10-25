@@ -54,12 +54,8 @@ int get_uid(int cfd, char *buf) {
 }
 
 int main() {
-	if (ensure_srv_dir_exists() != 0) {
-		fprintf(
-			stderr, COL_RED
-			"Unable to find or generate server directory, exiting\n" COL_RESET);
+	if (!ensure_srv_dir_exists())
 		return 1;
-	}
 
 	int sfd, cfd, ret = 0;
 	struct sockaddr_in saddr, caddr;
@@ -365,10 +361,10 @@ int ensure_srv_dir_exists() {
 	if (stat(HOSTDIR, &st) == -1) {
 		if (mkdir(HOSTDIR, 0700) == -1) {
 			perror("mkdir()");
-			return 1;
+			return 0;
 		}
 	}
-	return 0;
+	return 1;
 }
 
 __off_t get_used_space(const char *dir) {
