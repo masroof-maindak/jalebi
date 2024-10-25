@@ -12,16 +12,45 @@
 #include "../include/server.h"
 #include "../include/utils.h"
 
-int handle_authorisation(int cfd, const char *buf) {
-	/* recv in buffer */
+/**
+ * @brief verifies a user's credentials and returns their UID
+ */
+int get_uid(int cfd, char *buf) {
+	char mode, un[PW_MAX_LEN + 1], pw[PW_MAX_LEN + 1];
+	uint8_t unL, pwL;
+	int uid;
 
-	/* if login, query DB */
+	if (recv(cfd, buf, sizeof(buf), 0) == -1) {
+		perror("recv");
+		return -1;
+	}
 
-	/* if register, query DB */
+	mode = buf[0], unL = buf[1], pwL = buf[2];
+	if ((mode != 'L' && mode != 'R') ||
+		(unL < PW_MIN_LEN || unL > PW_MAX_LEN) ||
+		(pwL < PW_MIN_LEN || pwL > PW_MAX_LEN))
+		return -2;
 
-	/* send success */
+	memcpy(un, buf + 3, unL);
+	memcpy(pw, buf + 3 + unL, pwL);
+	un[unL] = pw[pwL] = '\0';
 
-	return 0;
+	/* TODO: sqlite interfacing functions */
+	switch (mode) {
+	case 'L':
+		return -3;
+		break;
+	case 'R':
+		return -4;
+		break;
+	}
+
+	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) != 0) {
+		perror("send");
+		return -5;
+	}
+
+	return uid;
 }
 
 int main() {
@@ -75,8 +104,8 @@ void *handle_client(void *arg) {
 	int cfd, status = 0;
 	enum REQUEST reqType;
 	ssize_t bytesRead;
-	char *buf;
-	unsigned long uid;
+	char *buf, userDir[BUFSIZE];
+	long uid;
 
 	if ((buf = malloc(BUFSIZE)) == NULL) {
 		perror("malloc()");
@@ -84,7 +113,8 @@ void *handle_client(void *arg) {
 	}
 
 	cfd = *(int *)arg;
-	if ((uid = handle_authorisation(cfd, buf)) != 0)
+	if ((uid = get_uid(cfd, buf)) >= 0 &&
+		(snprintf(userDir, sizeof(userDir), "%s/%ld", HOSTDIR, uid)) < 0)
 		goto cleanup;
 
 	while (status == 0) {
@@ -102,13 +132,13 @@ void *handle_client(void *arg) {
 
 		switch (reqType) {
 		case VIEW:
-			status = serv_wrap_view(cfd, uid);
+			status = serv_wrap_view(cfd, userDir);
 			break;
 		case DOWNLOAD:
-			status = serv_wrap_upload(cfd, buf, uid);
+			status = serv_wrap_upload(cfd, buf, userDir);
 			break;
 		case UPLOAD:
-			status = serv_wrap_download(cfd, buf, uid);
+			status = serv_wrap_download(cfd, buf, userDir);
 			break;
 		default:
 			if ((send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1) {
@@ -164,7 +194,7 @@ int init_server_socket(struct sockaddr_in *saddr) {
 
 /**
  * @details This function is called when the user opts to DOWNLOAD a file.
- * 	- Check if the file exists inside HOSTDIR
+ * 	- Check if the file exists inside the user's directory
  * 	- If not, send() back $FAILURE$FILE_NOT_FOUND$, else send $SUCCESS$
  * 	- recv() acknowledgement
  * 	- Else, send() back it's size
@@ -172,7 +202,7 @@ int init_server_socket(struct sockaddr_in *saddr) {
  *
  * @param[buf] the buffer containing the request $DOWNLOAD$<fname>$
  */
-int serv_wrap_upload(const int cfd, const char *buf) {
+int serv_wrap_upload(const int cfd, const char *buf, char *userDir) {
 	size_t fsize;
 	char const *fname;
 	char fpath[BUFSIZE >> 1];
@@ -180,7 +210,7 @@ int serv_wrap_upload(const int cfd, const char *buf) {
 	struct stat st;
 
 	fname = buf + 10;
-	n	  = snprintf(fpath, sizeof(fpath), HOSTDIR "/%s", fname);
+	n	  = snprintf(fpath, sizeof(fpath), "%s/%s", userDir, fname);
 
 	if (n < 0)
 		return -1;
@@ -220,7 +250,7 @@ int serv_wrap_upload(const int cfd, const char *buf) {
  * @details This function is called when the user opts to UPLOAD a file.
  * 	- Sends back SUCCESS after determining the request type
  * 	- Receives the file's total size from the client
- * 	- Checks if there is enough space in the HOSTDIR to accomodate this file
+ * 	- Checks if there is enough space in the user's dir to accomodate this file
  * 	- If not, sends back $FAILURE$LOW_SPACE$
  * 	- If yes, sends back $SUCCESS$
  * 	- Calls the main download function (download) using the `bytes`
@@ -229,7 +259,7 @@ int serv_wrap_upload(const int cfd, const char *buf) {
  *
  * @param[buf] the buffer containing the request $UPLOAD$<fname>$
  */
-int serv_wrap_download(const int cfd, const char *buf) {
+int serv_wrap_download(const int cfd, const char *buf, char *userDir) {
 	size_t fsize;
 	int n;
 	char const *fname;
@@ -248,7 +278,7 @@ int serv_wrap_download(const int cfd, const char *buf) {
 		return -3;
 	}
 
-	if ((usedSpace = get_used_space(HOSTDIR)) + fsize > MAX_CLIENT_SPACE) {
+	if ((usedSpace = get_used_space(userDir)) + fsize > MAX_CLIENT_SPACE) {
 		if (send(cfd, ULOAD_FAILURE_MSG, sizeof(ULOAD_FAILURE_MSG), 0) == -1) {
 			perror("send()");
 			return -5;
@@ -268,7 +298,7 @@ int serv_wrap_download(const int cfd, const char *buf) {
 		return -5;
 	}
 
-	n = snprintf(fpath, sizeof(fpath), HOSTDIR "/%s", fname);
+	n = snprintf(fpath, sizeof(fpath), "%s/%s", userDir, fname);
 	if (n < 0)
 		return -6;
 
@@ -285,7 +315,7 @@ int serv_wrap_download(const int cfd, const char *buf) {
 	return 0;
 }
 
-int serv_wrap_view(int cfd, int uid) {
+int serv_wrap_view(int cfd, char *userDir) {
 	int status = 0;
 	ssize_t idx;
 	char *ret;
@@ -296,7 +326,7 @@ int serv_wrap_view(int cfd, int uid) {
 	}
 
 	/* error while viewing */
-	if ((idx = view(ret, BUFSIZE)) < 0) {
+	if ((idx = view(ret, BUFSIZE, userDir)) < 0) {
 		fprintf(stderr, "Internal error occured while `view`ing!\n");
 		status = -2;
 		goto cleanup;

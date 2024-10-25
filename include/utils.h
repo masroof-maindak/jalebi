@@ -3,6 +3,8 @@
 
 #include <sys/types.h>
 
+#define PW_MAX_LEN		  30
+#define PW_MIN_LEN		  4
 #define SERVER_PORT		  9173
 #define BUFSIZE			  1024
 #define HOSTDIR			  "srv"
@@ -29,7 +31,7 @@ enum REQUEST { VIEW = 1, DOWNLOAD, UPLOAD, INVALID };
 char *copy_string(const char *str);
 enum REQUEST identify_request(const char *buf);
 int recv_success(int sockfd, const char *err);
-ssize_t view(char *buf, size_t size);
+ssize_t view(char *buf, size_t size, char *dir);
 
 char *double_if_of(char *buf, size_t idx, size_t addition, size_t *size);
 

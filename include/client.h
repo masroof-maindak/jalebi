@@ -9,8 +9,6 @@
 #define SERVER_IP		 "127.0.0.1"
 #define USER_INPUT_LIMIT 128
 #define RESPONSE_LIMIT	 128
-#define PW_MAX_LEN		 30
-#define PW_MIN_LEN		 4
 
 enum REQUEST handle_input(char *userInput);
 int init_client_socket(struct sockaddr_in *saddr);
@@ -20,7 +18,7 @@ char *extract_filename_if_exists(const char *fpath, struct stat *fstat);
 char select_mode();
 char *get_password(char *pw, uint8_t *pwLen);
 char *get_username(char *un, uint8_t *unLen);
-int user_authorisation(int sfd);
+int user_authentication(int sfd);
 int send_auth_info(int sfd, char mode, const char *pw, const char *un,
 				   uint8_t unLen, uint8_t pwLen);
 

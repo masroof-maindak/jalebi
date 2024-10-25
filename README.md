@@ -2,14 +2,14 @@
 
 ### TODO
 
-- [/] auth.h/.c - login/register
-    - [x] SQLite integration
-    - [/] thread-local userid
-    - [ ] `HOSTDIR` -> `HOSTDIR/userid`
+- [ ] Server-side authentication
+    - [x] thread-local uid & userDir
+    - [x] `HOSTDIR` -> `HOSTDIR/userid`
+    - [ ] SQLite integration
 - [ ] queue.h/.c
     - [ ] server-side handler thread
-    - [ ] reader/writer threads depending on userid
-- [ ] Use restrict keywords where applicable
+    - [ ] reader/writer threads depending on uid
+- [ ] Use restrict keyword where applicable
 - [ ] close() -> shutdown() for sockets; should I?
     - [ ] Relevant signal handlers
 - [ ] Log error messages in non-perror-able call stacks

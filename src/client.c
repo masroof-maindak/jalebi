@@ -26,7 +26,7 @@ int main() {
 	printf(COL_GREEN "Succesfully connected to server -- %s:%d\n" COL_RESET,
 		   SERVER_IP, SERVER_PORT);
 
-	status = user_authorisation(sfd);
+	status = user_authentication(sfd);
 
 	while (status == 0) {
 		userInput = readline("namak-paare > ");
@@ -127,7 +127,7 @@ int send_auth_info(int sfd, char mode, const char *pw, const char *un,
 /**
  * @brief register OR log-in user w/ server; returns 0 on success
  */
-int user_authorisation(int sfd) {
+int user_authentication(int sfd) {
 	char *un = NULL, *pw = NULL, opt = select_mode();
 	uint8_t unLen = 0, pwLen = 0, ret = 0;
 

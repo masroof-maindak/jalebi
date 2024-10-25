@@ -49,7 +49,7 @@ char *double_if_of(char *buf, size_t idx, size_t addition, size_t *size) {
 	return buf;
 }
 
-ssize_t view(char *buf, size_t size) {
+ssize_t view(char *buf, size_t size, char* dir) {
 	DIR *d;
 	size_t idx = 0, entSz;
 	int n;
@@ -57,7 +57,7 @@ ssize_t view(char *buf, size_t size) {
 	struct dirent *ent;
 	struct stat inf;
 
-	if ((d = opendir(HOSTDIR)) == NULL) {
+	if ((d = opendir(dir)) == NULL) {
 		perror("opendir()");
 		return -1;
 	}
