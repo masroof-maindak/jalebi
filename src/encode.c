@@ -5,51 +5,44 @@
 #include "../include/utils.h"
 
 /**
- * @param[bytesToEncode] len of input str
+ * @param bytesToEncode len of input str
  * @return < 0 if error else size of ret
  */
-
-// Assuming that the size of ret = size of str
-// bytesToEncode = size of str
-int run_length_encode(const char *str, char *ret, size_t bytesToEncode) {
+int run_length_encode(const char *str, char *ret, size_t len) {
 	char current, prev;
 	size_t bytes = 0, idx = 1;
 	int count = 1;
 
-	if (ret == NULL) {
+	if (ret == NULL)
 		return -1;
-	}
 
-	if (bytesToEncode <= 1) {
+	if (len <= 1)
 		return -2;
-	}
 
 	prev = str[0];
-	while (idx <= bytesToEncode) {
+	while (idx <= len) {
 		current = str[idx++];
 		if (current == prev) {
 			count++;
 		} else {
 
-			if ((ret = double_if_of(ret, idx, 10, &bytesToEncode)) == NULL)
+			if ((ret = double_if_of(ret, idx, 10, &len)) == NULL)
 				return -3;
 
-			bytes += snprintf(ret + bytes, bytesToEncode - bytes, "%c%d", prev,
-							  count);
+			bytes += snprintf(ret + bytes, len - bytes, "%c%d", prev, count);
 
 			prev  = current;
 			count = 1;
 		}
 	}
 
-	if ((ret = double_if_of(ret, idx, 10, &bytesToEncode)) == NULL)
+	if ((ret = double_if_of(ret, idx, 10, &len)) == NULL)
 		return -3;
 
-	snprintf(ret + bytes, bytesToEncode - bytes, "%c%d", prev, count);
+	snprintf(ret + bytes, len - bytes, "%c%d", prev, count);
 	return 0;
 }
 
-// Assuming ret size = encStr size
 int run_length_decode(char *encStr, char *ret, size_t size) {
 	char c;
 	int count;
