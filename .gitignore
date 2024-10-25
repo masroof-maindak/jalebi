@@ -5,3 +5,4 @@ build/
 jalebi
 namak-paare
 srv/
+sqlite.db

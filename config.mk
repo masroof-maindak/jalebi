@@ -3,7 +3,7 @@ CC = gcc
 CFLAGS = -Wall -Wextra -pedantic
 RELEASE_FLAGS = -march=native -O3
 DEBUG_FLAGS = -g3 -O0
-LDFLAGS = -lreadline -lbsd
+LDFLAGS = -lreadline -lbsd -lsqlite3 -lcrypto
 
 SRCDIR = src
 BUILDDIR = build

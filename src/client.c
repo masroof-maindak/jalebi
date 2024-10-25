@@ -1,6 +1,5 @@
 #include <arpa/inet.h>
 #include <errno.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,7 +22,7 @@ int main() {
 	if ((sfd = init_client_socket(&saddr)) < 0)
 		return 1;
 
-	printf(COL_GREEN "Succesfully connected to server -- %s:%d\n" COL_RESET,
+	printf(COL_GREEN "Succesfully connected to Jalebi -- %s:%d\n" COL_RESET,
 		   SERVER_IP, SERVER_PORT);
 
 	status = user_authentication(sfd);
