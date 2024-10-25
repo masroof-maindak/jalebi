@@ -5,7 +5,7 @@
 - [/] auth.h/.c - login/register
     - [x] SQLite integration
     - [/] thread-local userid
-    - [ ] Replace all uses of `HOSTDIR` w/ `HOSTDIR/userid`
+    - [ ] `HOSTDIR` -> `HOSTDIR/userid`
 - [ ] queue.h/.c
     - [ ] server-side handler thread
     - [ ] reader/writer threads depending on userid

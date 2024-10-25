@@ -12,6 +12,18 @@
 #include "../include/server.h"
 #include "../include/utils.h"
 
+int handle_authorisation(int cfd, const char *buf) {
+	/* recv in buffer */
+
+	/* if login, query DB */
+
+	/* if register, query DB */
+
+	/* send success */
+
+	return 0;
+}
+
 int main() {
 	if (ensure_srv_dir_exists() != 0) {
 		fprintf(
@@ -31,7 +43,6 @@ int main() {
 		return 2;
 
 	for (;;) {
-
 		if ((cfd = accept(sfd, (struct sockaddr *)&caddr, &addrSize)) == -1) {
 			perror("accept()");
 			ret = 3;
@@ -61,21 +72,20 @@ cleanup:
 }
 
 void *handle_client(void *arg) {
-	int cfd, status;
+	int cfd, status = 0;
 	enum REQUEST reqType;
 	ssize_t bytesRead;
 	char *buf;
-	unsigned long uid = -1;
+	unsigned long uid;
 
 	if ((buf = malloc(BUFSIZE)) == NULL) {
 		perror("malloc()");
 		pthread_exit(NULL);
 	}
 
-	/* TODO: handle login/register */
-
-	cfd	   = *(int *)arg;
-	status = 0;
+	cfd = *(int *)arg;
+	if ((uid = handle_authorisation(cfd, buf)) != 0)
+		goto cleanup;
 
 	while (status == 0) {
 		if ((bytesRead = recv(cfd, buf, BUFSIZE, 0)) == -1) {
@@ -92,13 +102,13 @@ void *handle_client(void *arg) {
 
 		switch (reqType) {
 		case VIEW:
-			status = serv_wrap_view(cfd);
+			status = serv_wrap_view(cfd, uid);
 			break;
 		case DOWNLOAD:
-			status = serv_wrap_upload(cfd, buf);
+			status = serv_wrap_upload(cfd, buf, uid);
 			break;
 		case UPLOAD:
-			status = serv_wrap_download(cfd, buf);
+			status = serv_wrap_download(cfd, buf, uid);
 			break;
 		default:
 			if ((send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1) {

@@ -11,8 +11,8 @@ int init_server_socket(struct sockaddr_in *saddr);
 int ensure_srv_dir_exists();
 __off_t get_used_space(const char *dir);
 
-int serv_wrap_view(int cfd);
-int serv_wrap_upload(int cfd, const char *buf);
-int serv_wrap_download(int cfd, const char *buf);
+int serv_wrap_view(int cfd, int uid);
+int serv_wrap_upload(int cfd, const char *buf, int uid);
+int serv_wrap_download(int cfd, const char *buf, int uid);
 
 #endif // SERVER_H
