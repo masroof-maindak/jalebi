@@ -52,8 +52,8 @@ char *double_if_of(char *buf, size_t idx, size_t addition, size_t *size) {
 ssize_t view(char *buf, size_t size) {
 	DIR *d;
 	size_t idx = 0, entSz;
+	int n;
 	char path[BUFSIZE >> 1];
-	int sz;
 	struct dirent *ent;
 	struct stat inf;
 
@@ -79,12 +79,13 @@ ssize_t view(char *buf, size_t size) {
 			goto cleanup;
 		}
 
-		sz = snprintf(buf + idx, entSz, "%s - %ld\n", ent->d_name, inf.st_size);
-		if (sz < 0) {
+		n = snprintf(buf + idx, entSz, "%s - %ld\n", ent->d_name, inf.st_size);
+		if (n < 0) {
 			idx = -4;
 			goto cleanup;
 		}
-		idx += sz;
+
+		idx += n;
 	}
 
 	buf[idx] = '\0';
@@ -105,14 +106,14 @@ enum REQUEST identify_request(const char *buf) {
 
 /**
  * @brief download a total of 'bytes' bytes from a socket, into
- * `filename` file
+ * `fname` file
  */
-int download(const char *filename, size_t bytes, int sfd) {
+int download(const char *fname, size_t bytes, int sfd) {
 	FILE *fp;
 	int bytesRead, toRead, ret = 0;
 	char *buf;
 
-	if ((fp = fopen(filename, "w")) == NULL) {
+	if ((fp = fopen(fname, "w")) == NULL) {
 		perror("fopen()");
 		return 1;
 	}
@@ -156,16 +157,16 @@ cleanup:
 }
 
 /**
- * @brief upload `bytes` bytes, from `filename` file, to the socket
+ * @brief upload `bytes` bytes, from `fname` file, to the socket
  *
  * @note the file's existence must be guaranteed before calling this function
  */
-int upload(const char *filename, size_t bytes, int sfd) {
+int upload(const char *fname, size_t bytes, int sfd) {
 	FILE *fp;
 	int bytesRead, toWrite, ret = 0;
 	char *buf;
 
-	if ((fp = fopen(filename, "r")) == NULL) {
+	if ((fp = fopen(fname, "r")) == NULL) {
 		perror("fopen()");
 		return 1;
 	}

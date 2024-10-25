@@ -14,8 +14,9 @@
 
 int main() {
 	if (ensure_srv_dir_exists() != 0) {
-		fprintf(stderr,
-				"Unable to find or generate server directory, exiting\n");
+		fprintf(
+			stderr, COL_RED
+			"Unable to find or generate server directory, exiting\n" COL_RESET);
 		return 1;
 	}
 
@@ -159,42 +160,47 @@ int init_server_socket(struct sockaddr_in *saddr) {
  * 	- Else, send() back it's size
  * 	- Call upload function to send() file until nothing remains
  *
- * @param[buf] the buffer containing the request $DOWNLOAD$<filename>$
+ * @param[buf] the buffer containing the request $DOWNLOAD$<fname>$
  */
-int serv_wrap_upload(const int cfd, char *buf) {
+int serv_wrap_upload(const int cfd, const char *buf) {
 	size_t fsize;
-	char *filename, filepath[BUFSIZE >> 1];
+	char const *fname;
+	char fpath[BUFSIZE >> 1];
+	int n;
 	struct stat st;
 
-	filename = buf + 10;
-	snprintf(filepath, sizeof(filepath), HOSTDIR "/%s", filename);
+	fname = buf + 10;
+	n	  = snprintf(fpath, sizeof(fpath), HOSTDIR "/%s", fname);
 
-	if (stat(filepath, &st) != 0) {
+	if (n < 0)
+		return -1;
+
+	if (stat(fpath, &st) != 0) {
 		if (send(cfd, DLOAD_FAILURE_MSG, sizeof(DLOAD_FAILURE_MSG), 0) == -1) {
 			perror("send()");
-			return -1;
+			return -2;
 		}
 		return 0;
 	} else {
 		if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 			perror("send()");
-			return -2;
+			return -3;
 		}
 	}
 
 	/* TODO: timeout if no response for a while */
 	if ((recv_success(cfd, "Client never acknowledged receive")) < 0)
-		return -3;
+		return -4;
 
 	fsize = st.st_size;
 	if (send(cfd, &fsize, sizeof(fsize), 0) == -1) {
 		perror("send()");
-		return -4;
+		return -5;
 	}
 
-	if (upload(filepath, fsize, cfd) < 0) {
+	if (upload(fpath, fsize, cfd) < 0) {
 		fprintf(stderr, "upload()\n");
-		return -5;
+		return -6;
 	}
 
 	return 0;
@@ -211,11 +217,13 @@ int serv_wrap_upload(const int cfd, char *buf) {
  * 	  acquired from #2
  * 	- Sends $SUCCESS$ again
  *
- * @param[buf] the buffer containing the request $UPLOAD$<filename>$
+ * @param[buf] the buffer containing the request $UPLOAD$<fname>$
  */
-int serv_wrap_download(const int cfd, char *buf) {
+int serv_wrap_download(const int cfd, const char *buf) {
 	size_t fsize;
-	char *filename, filepath[BUFSIZE << 1];
+	int n;
+	char const *fname;
+	char fpath[BUFSIZE << 1];
 	__off_t usedSpace;
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
@@ -223,7 +231,7 @@ int serv_wrap_download(const int cfd, char *buf) {
 		return -2;
 	}
 
-	filename = buf + 8;
+	fname = buf + 8;
 
 	if (recv(cfd, &fsize, sizeof(fsize), 0) == -1) {
 		perror("recv()");
@@ -250,15 +258,18 @@ int serv_wrap_download(const int cfd, char *buf) {
 		return -5;
 	}
 
-	snprintf(filepath, sizeof(filepath), HOSTDIR "/%s", filename);
-	if (download(filepath, fsize, cfd) != 0) {
-		fprintf(stderr, "download()\n");
+	n = snprintf(fpath, sizeof(fpath), HOSTDIR "/%s", fname);
+	if (n < 0)
 		return -6;
+
+	if (download(fpath, fsize, cfd) != 0) {
+		fprintf(stderr, "download()\n");
+		return -7;
 	}
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send()");
-		return -7;
+		return -8;
 	}
 
 	return 0;

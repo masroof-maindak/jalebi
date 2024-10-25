@@ -108,16 +108,15 @@ char *get_username(char *un, uint8_t *unLen) {
 }
 
 int send_auth_info(int sfd, char mode, const char *pw, const char *un,
-				   uint8_t unLen, uint8_t pwLen) {
+				   uint8_t unL, uint8_t pwL) {
 	char buf[64];
-	ssize_t written;
+	int n;
 
-	if ((written = snprintf(buf, sizeof(buf), "%c%d%d%s%s", mode, unLen, pwLen,
-							un, pw)) < 0) {
+	n = snprintf(buf, sizeof(buf), "%c%d%d%s%s", mode, unL, pwL, un, pw);
+	if (n < 0)
 		return -1;
-	}
 
-	if (send(sfd, buf, written, 0) == -1) {
+	if (send(sfd, buf, n, 0) == -1) {
 		perror("send()");
 		return -2;
 	}
@@ -155,12 +154,9 @@ cleanup:
 	return ret;
 }
 
-
-int client_wrap_download(int sfd, char *buf) {
-	char *filename;
-	size_t fsize = 0;
-
-	filename = buf + 10;
+int client_wrap_download(int sfd, const char *buf) {
+	const char *fname = buf + 10;
+	size_t fsize	  = 0;
 
 	/* send download message */
 	if (send(sfd, buf, strlen(buf), 0) == -1) {
@@ -185,7 +181,7 @@ int client_wrap_download(int sfd, char *buf) {
 	}
 
 	/* download file */
-	if (download(filename, fsize, sfd) != 0) {
+	if (download(fname, fsize, sfd) != 0) {
 		fprintf(stderr, "download()\n");
 		return -4;
 	}
@@ -214,7 +210,6 @@ char *extract_filename_if_exists(const char *fpath, struct stat *fstat) {
 			fnSave = fname;
 		} while ((fname = strtok(NULL, "/")) != NULL);
 	}
-
 	fname = fnSave;
 
 	char *result = copy_string(fname);
@@ -222,25 +217,28 @@ char *extract_filename_if_exists(const char *fpath, struct stat *fstat) {
 	return result;
 }
 
-int client_wrap_upload(int sfd, char *buf) {
-	char *filepath = buf + 8, *filename = NULL, msg[BUFSIZE];
+int client_wrap_upload(int sfd, const char *buf) {
+	char const *fpath;
+	char *fname = NULL, msg[BUFSIZE];
 	struct stat fstat;
 	size_t fsize = 0;
-	ssize_t written;
+	int n;
 
-	if ((filename = extract_filename_if_exists(filepath, &fstat)) == NULL)
+	fpath = buf + 8;
+
+	if ((fname = extract_filename_if_exists(fpath, &fstat)) == NULL)
 		return -1;
 
 	/* send upload message */
-	if ((written = snprintf(msg, sizeof(msg), "$UPLOAD$%s", filename)) < 0)
+	if ((n = snprintf(msg, sizeof(msg), "$UPLOAD$%s", fname)) < 0)
 		return -2;
 
-	if (send(sfd, msg, written, 0) == -1) {
+	if (send(sfd, msg, n, 0) == -1) {
 		perror("send()");
 		return -3;
 	}
 
-	free(filename);
+	free(fname);
 
 	if ((recv_success(sfd, "Error: something went wrong!")) < 0)
 		return -4;
@@ -255,7 +253,7 @@ int client_wrap_upload(int sfd, char *buf) {
 	if ((recv_success(sfd, "Error: Not enough space available!")) < 0)
 		return -6;
 
-	if (upload(filepath, fsize, sfd) < 0) {
+	if (upload(fpath, fsize, sfd) < 0) {
 		perror("upload()");
 		return -7;
 	}
