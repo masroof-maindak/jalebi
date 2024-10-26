@@ -49,10 +49,8 @@ char *get_salt() {
 
 	srand(time(NULL));
 
-	for (int i = 0; i < SALT_LENGTH; i++) {
-		int idx = rand() % (sizeof(ALPHA_NUMERIC) - 1);
-		salt[i] = ALPHA_NUMERIC[idx];
-	}
+	for (int i = 0; i < SALT_LENGTH; i++)
+		salt[i] = ALPHA_NUMERIC[rand() % (sizeof(ALPHA_NUMERIC) - 1)];
 
 	salt[SALT_LENGTH] = '\0';
 	return salt;

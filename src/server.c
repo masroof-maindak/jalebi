@@ -12,33 +12,6 @@
 #include "../include/server.h"
 #include "../include/utils.h"
 
-/**
- * @brief registers/verifies a user's credentials
- * @return UID on success, negative value on failure
- */
-int64_t get_uid(int cfd, char *buf) {
-	char mode, un[PW_MAX_LEN + 1], pw[PW_MAX_LEN + 1];
-	uint8_t unL, pwL;
-	int64_t uid = -1;
-
-	if (recv(cfd, buf, BUFSIZE, 0) == -1) {
-		perror("recv");
-		return -1;
-	}
-
-	mode = buf[0], unL = buf[1], pwL = buf[2];
-	if ((mode != 'L' && mode != 'R') ||
-		(unL < PW_MIN_LEN || unL > PW_MAX_LEN) ||
-		(pwL < PW_MIN_LEN || pwL > PW_MAX_LEN))
-		return -2;
-
-	memcpy(un, buf + 3, unL);
-	memcpy(pw, buf + 3 + unL, pwL);
-	un[unL] = pw[pwL] = '\0';
-	uid = (mode == 'L') ? verify_user(un, pw) : register_user(un, pw);
-	return uid;
-}
-
 int main() {
 	if (!ensure_dir_exists(HOSTDIR) || init_db() != 0)
 		return 1;
@@ -101,10 +74,9 @@ void *handle_client(void *arg) {
 	cfd = *(int *)arg;
 
 	/* get uid, make directory, send success/failure */
-	if ((uid = get_uid(cfd, buf)) < 0 ||
+	if ((uid = authenticate_and_get_uid(cfd, buf)) < 0 ||
 		(snprintf(udir, sizeof(udir), "%s/%ld", HOSTDIR, uid)) < 0 ||
 		!ensure_dir_exists(udir)) {
-		printf("uid - %ld :: udir - %s\n", uid, udir);
 		if (send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0) == -1)
 			perror("send()");
 		goto cleanup;
@@ -130,13 +102,13 @@ void *handle_client(void *arg) {
 
 		switch (reqType) {
 		case VIEW:
-			status = serv_wrap_view(cfd, udir);
+			status = server_wrap_view(cfd, udir);
 			break;
 		case DOWNLOAD:
-			status = serv_wrap_upload(cfd, buf, udir);
+			status = server_wrap_upload(cfd, buf, udir);
 			break;
 		case UPLOAD:
-			status = serv_wrap_download(cfd, buf, udir);
+			status = server_wrap_download(cfd, buf, udir);
 			break;
 		default:
 			if ((send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1) {
@@ -200,10 +172,10 @@ int init_server_socket(struct sockaddr_in *saddr) {
  *
  * @param[buf] the buffer containing the request $DOWNLOAD$<fname>$
  */
-int serv_wrap_upload(const int cfd, const char *buf, char *udir) {
+int server_wrap_upload(const int cfd, const char *buf, char *udir) {
 	size_t fsize;
 	char const *fname;
-	char fpath[BUFSIZE >> 1];
+	char fpath[PATH_MAX];
 	int n;
 	struct stat st;
 
@@ -257,11 +229,11 @@ int serv_wrap_upload(const int cfd, const char *buf, char *udir) {
  *
  * @param[buf] the buffer containing the request $UPLOAD$<fname>$
  */
-int serv_wrap_download(const int cfd, const char *buf, char *udir) {
+int server_wrap_download(const int cfd, const char *buf, char *udir) {
 	size_t fsize;
 	int n;
 	char const *fname;
-	char fpath[BUFSIZE << 1], *err = NULL;
+	char fpath[PATH_MAX], *err = NULL;
 	__off_t usedSpace;
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
@@ -311,7 +283,7 @@ int serv_wrap_download(const int cfd, const char *buf, char *udir) {
 	return 0;
 }
 
-int serv_wrap_view(int cfd, char *udir) {
+int server_wrap_view(int cfd, char *udir) {
 	int status = 0;
 	ssize_t idx;
 	char *ret;
@@ -321,7 +293,7 @@ int serv_wrap_view(int cfd, char *udir) {
 		return -1;
 	}
 
-	/* get list of entries & size */
+	/* get list of entries + size and send latter */
 	if ((idx = view(ret, BUFSIZE, udir)) < 0) {
 		status = -2;
 		goto cleanup;
@@ -330,6 +302,7 @@ int serv_wrap_view(int cfd, char *udir) {
 	if ((send(cfd, &idx, sizeof(idx), 0)) == -1) {
 		perror("send()");
 		status = -3;
+		goto cleanup;
 	}
 
 	/* no files */
@@ -364,8 +337,8 @@ int ensure_dir_exists(char *d) {
 __off_t get_used_space(const char *dir) {
 	struct dirent *entry;
 	struct stat st;
-	char fpath[BUFSIZE];
-	int size = 0;
+	char fpath[PATH_MAX];
+	__off_t size = 0;
 	DIR *d;
 
 	if ((d = opendir(dir)) == NULL) {
@@ -393,4 +366,31 @@ __off_t get_used_space(const char *dir) {
 
 	closedir(d);
 	return size;
+}
+
+/**
+ * @brief registers/verifies a user's credentials
+ * @return UID on success, negative value on failure
+ */
+int64_t authenticate_and_get_uid(int cfd, char *buf) {
+	char mode, un[PW_MAX_LEN + 1], pw[PW_MAX_LEN + 1];
+	uint8_t unL, pwL;
+	int64_t uid = -1;
+
+	if (recv(cfd, buf, BUFSIZE, 0) == -1) {
+		perror("recv");
+		return -1;
+	}
+
+	mode = buf[0], unL = buf[1], pwL = buf[2];
+	if ((mode != 'L' && mode != 'R') ||
+		(unL < PW_MIN_LEN || unL > PW_MAX_LEN) ||
+		(pwL < PW_MIN_LEN || pwL > PW_MAX_LEN))
+		return -2;
+
+	memcpy(un, buf + 3, unL);
+	memcpy(pw, buf + 3 + unL, pwL);
+	un[unL] = pw[pwL] = '\0';
+	uid = (mode == 'L') ? verify_user(un, pw) : register_user(un, pw);
+	return uid;
 }

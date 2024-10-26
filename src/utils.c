@@ -33,12 +33,18 @@ uint32_t get_num_digits(__off_t n) {
 	return r;
 }
 
-char *double_if_of(char *buf, size_t idx, size_t addition, size_t *size) {
+/**
+ * @detail if adding `add` bytes to `buf`, (whose maximum capacity is
+ * `size` and currently has `idx` bytes written), would overflow it, then double
+ * `buf`. `size` is updated in this case.
+ *
+ * @return
+ */
+char *double_if_Of(char *buf, size_t idx, size_t add, size_t *size) {
 	char *tmp = NULL;
 
-	if (idx + addition > *size) {
+	if (idx + add > *size) {
 		*size *= 2;
-
 		if ((tmp = realloc(buf, *size)) == NULL) {
 			perror("realloc()");
 			free(buf);
@@ -49,15 +55,15 @@ char *double_if_of(char *buf, size_t idx, size_t addition, size_t *size) {
 	return buf;
 }
 
-ssize_t view(char *buf, size_t size, char *dir) {
+ssize_t view(char *buf, size_t size, char *udir) {
 	DIR *d;
-	size_t idx = 0, entSz;
+	size_t idx = 0, entLen;
 	int n;
-	char path[BUFSIZE >> 1];
+	char upath[PATH_MAX];
 	struct dirent *ent;
 	struct stat inf;
 
-	if ((d = opendir(dir)) == NULL) {
+	if ((d = opendir(udir)) == NULL) {
 		perror("opendir()");
 		return -1;
 	}
@@ -66,20 +72,20 @@ ssize_t view(char *buf, size_t size, char *dir) {
 		if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, ".."))
 			continue;
 
-		sprintf(path, "%s/%s", dir, ent->d_name);
-		if ((stat(path, &inf)) != 0) {
+		sprintf(upath, "%s/%s", udir, ent->d_name);
+		if ((stat(upath, &inf)) != 0) {
 			perror("stat()");
 			idx = -2;
 			goto cleanup;
 		}
 
-		entSz = strlen(ent->d_name) + get_num_digits(inf.st_size) + 5;
-		if ((buf = double_if_of(buf, idx, entSz, &size)) == NULL) {
+		entLen = strlen(ent->d_name) + get_num_digits(inf.st_size) + 5;
+		if ((buf = double_if_Of(buf, idx, entLen, &size)) == NULL) {
 			idx = -3;
 			goto cleanup;
 		}
 
-		n = snprintf(buf + idx, entSz, "%s - %ld\n", ent->d_name, inf.st_size);
+		n = snprintf(buf + idx, entLen, "%s - %ld\n", ent->d_name, inf.st_size);
 		if (n < 0) {
 			idx = -4;
 			goto cleanup;

@@ -25,7 +25,7 @@ int run_length_encode(const char *str, char *ret, size_t len) {
 			count++;
 		} else {
 
-			if ((ret = double_if_of(ret, idx, 10, &len)) == NULL)
+			if ((ret = double_if_Of(ret, idx, 10, &len)) == NULL)
 				return -3;
 
 			bytes += snprintf(ret + bytes, len - bytes, "%c%d", prev, count);
@@ -35,7 +35,7 @@ int run_length_encode(const char *str, char *ret, size_t len) {
 		}
 	}
 
-	if ((ret = double_if_of(ret, idx, 10, &len)) == NULL)
+	if ((ret = double_if_Of(ret, idx, 10, &len)) == NULL)
 		return -3;
 
 	snprintf(ret + bytes, len - bytes, "%c%d", prev, count);
@@ -67,7 +67,7 @@ int run_length_decode(char *encStr, char *ret, size_t size) {
 
 		while (count > 0) {
 
-			if ((ret = double_if_of(ret, bytes, 1, &size)) == NULL)
+			if ((ret = double_if_Of(ret, bytes, 1, &size)) == NULL)
 				return -2;
 
 			ret[bytes++] = c;
