@@ -21,12 +21,10 @@ int get_uid(int cfd, char *buf) {
 	uint8_t unL, pwL;
 	int uid = -1;
 
-	if (recv(cfd, buf, sizeof(buf), 0) == -1) {
+	if (recv(cfd, buf, BUFSIZE, 0) == -1) {
 		perror("recv");
 		return -1;
 	}
-
-	puts(buf);
 
 	mode = buf[0], unL = buf[1], pwL = buf[2];
 	if ((mode != 'L' && mode != 'R') ||
@@ -38,7 +36,6 @@ int get_uid(int cfd, char *buf) {
 	memcpy(pw, buf + 3 + unL, pwL);
 	un[unL] = pw[pwL] = '\0';
 	uid = (mode == 'L') ? verify_user(un, pw) : register_user(un, pw);
-
 	return uid;
 }
 
@@ -107,6 +104,7 @@ void *handle_client(void *arg) {
 	if ((uid = get_uid(cfd, buf)) < 0 ||
 		(snprintf(udir, sizeof(udir), "%s/%ld", HOSTDIR, uid)) < 0 ||
 		!ensure_dir_exists(udir)) {
+		printf("uid - %ld :: udir - %s\n", uid, udir);
 		if (send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0) == -1)
 			perror("send()");
 		goto cleanup;

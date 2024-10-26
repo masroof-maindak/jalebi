@@ -26,6 +26,6 @@ uninstall:
 	rm -f $(BINDIR)/namak-paare
 
 clean:
-	rm -f $(TARGETS) $(BUILDDIR)/*.o
+	rm -f $(TARGETS) $(BUILDDIR)/*.o sqlite.db
 
 .PHONY: all clean install uninstall
