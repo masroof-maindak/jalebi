@@ -1,3 +1,4 @@
+#include <openssl/sha.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -64,17 +65,20 @@ char *get_salt() {
 char *get_salted_pw(const char *pw, const char *salt) {
 	size_t len = strlen(pw) + SALT_LENGTH + 1;
 	char *saltedPw;
+	int n;
 
 	if ((saltedPw = malloc(len)) == NULL) {
 		perror("malloc()");
 		return NULL;
 	}
 
-	if (snprintf(saltedPw, len, "%s%s", pw, salt) < 0) {
+	n = snprintf(saltedPw, len, "%s%s", pw, salt);
+	if (n < 0) {
 		free(saltedPw);
 		return NULL;
 	}
 
+	saltedPw[n] = '\0';
 	return saltedPw;
 }
 
@@ -94,6 +98,7 @@ int64_t register_user(const char *un, const char *pw) {
 		return -1;
 
 	if ((pwSalt = get_salted_pw(pw, salt)) == NULL) {
+	if ((pwSalt = get_salted_pw(pw, salt)) == NULL) {
 		free(salt);
 		return -2;
 	}
@@ -103,16 +108,19 @@ int64_t register_user(const char *un, const char *pw) {
 	if (sqlite3_prepare_v2(db, insertSql, -1, &stmt, NULL) != SQLITE_OK) {
 		fprintf(stderr, "SQLite error: %s\n", sqlite3_errmsg(db));
 		uid = -3;
+		uid = -3;
 		goto cleanup;
 	}
 
 	sqlite3_bind_text(stmt, 1, un, -1, SQLITE_STATIC);
+	sqlite3_bind_blob(stmt, 2, pwHash, SHA256_DIGEST_LENGTH, SQLITE_STATIC);
 	sqlite3_bind_blob(stmt, 2, pwHash, SHA256_DIGEST_LENGTH, SQLITE_STATIC);
 	sqlite3_bind_text(stmt, 3, salt, -1, SQLITE_STATIC);
 
 	if (sqlite3_step(stmt) != SQLITE_DONE) {
 		fprintf(stderr, "SQLite error: %s\n", sqlite3_errmsg(db));
 		uid = -4;
+		goto cleanup;
 		goto cleanup;
 	}
 
@@ -128,6 +136,7 @@ cleanup:
  * @brief Verifies a user's credentials
  * @return uid on success, negative on failure
  */
+int64_t verify_user(const char *username, const char *pw) {
 int64_t verify_user(const char *username, const char *pw) {
 	const char *select_sql =
 		"SELECT password, salt, uid FROM users WHERE username = ?;";
@@ -154,6 +163,8 @@ int64_t verify_user(const char *username, const char *pw) {
 
 	char *pwSalt = get_salted_pw(pw, dbSalt);
 	if (pwSalt == NULL) {
+	char *pwSalt = get_salted_pw(pw, dbSalt);
+	if (pwSalt == NULL) {
 		sqlite3_finalize(stmt);
 		return -3;
 	}
@@ -165,10 +176,12 @@ int64_t verify_user(const char *username, const char *pw) {
 	if (memcmp(dbPwHash, pwHash, SHA256_DIGEST_LENGTH) != 0) {
 		sqlite3_finalize(stmt);
 		free(pwSalt);
+		free(pwSalt);
 		return -4;
 	}
 
 	sqlite3_finalize(stmt);
+	free(pwSalt);
 	free(pwSalt);
 	return uid;
 }
