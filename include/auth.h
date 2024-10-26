@@ -19,6 +19,9 @@
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZ"                                               \
 	"abcdefghijklmnopqrstuvwxyz"
 
+#define PW_SELECT_SQL                                                          \
+	"SELECT password, salt, uid FROM users WHERE username = ?;"
+
 int init_db();
 int close_db();
 

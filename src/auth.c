@@ -61,7 +61,7 @@ char *get_salt() {
 /**
  * @brief Concatenates the password and salt
  */
-char *get_salted_pw(const char *pw, const char *salt) {
+char *get_salted_pw(const char *pw, const unsigned char *salt) {
 	size_t len = strlen(pw) + SALT_LENGTH + 1;
 	char *saltedPw;
 
@@ -93,7 +93,7 @@ int64_t register_user(const char *un, const char *pw) {
 	if (salt == NULL)
 		return -1;
 
-	if ((pwSalt = get_salted_pw(pw, salt)) == NULL) {
+	if ((pwSalt = get_salted_pw(pw, (const unsigned char *)salt)) == NULL) {
 		free(salt);
 		return -2;
 	}
@@ -129,13 +129,10 @@ cleanup:
  * @return uid on success, negative on failure
  */
 int64_t verify_user(const char *username, const char *pw) {
-	const char *select_sql =
-		"SELECT password, salt, uid FROM users WHERE username = ?;";
 	sqlite3_stmt *stmt;
 
-	if (sqlite3_prepare_v2(db, select_sql, -1, &stmt, NULL) != SQLITE_OK) {
-		fprintf(stderr, "Failed to prepare statement: %s\n",
-				sqlite3_errmsg(db));
+	if (sqlite3_prepare_v2(db, PW_SELECT_SQL, -1, &stmt, NULL) != SQLITE_OK) {
+		fprintf(stderr, "SQLite error: %s\n", sqlite3_errmsg(db));
 		return -1;
 	}
 
@@ -147,11 +144,10 @@ int64_t verify_user(const char *username, const char *pw) {
 		return -2;
 	}
 
-	const unsigned char *dbPwHash =
-		(const unsigned char *)sqlite3_column_blob(stmt, 0);
-	const char *dbSalt = (const char *)sqlite3_column_text(stmt, 1);
-	const int64_t uid  = sqlite3_column_int(stmt, 2);
-	char *pwSalt = get_salted_pw(pw, dbSalt);
+	const unsigned char *dbPwHash = sqlite3_column_blob(stmt, 0);
+	const unsigned char *dbSalt	  = sqlite3_column_text(stmt, 1);
+	const int64_t uid			  = sqlite3_column_int(stmt, 2);
+	char *pwSalt				  = get_salted_pw(pw, dbSalt);
 
 	if (pwSalt == NULL) {
 		sqlite3_finalize(stmt);
