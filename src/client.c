@@ -145,7 +145,7 @@ int user_authentication(int sfd) {
 		goto cleanup;
 	}
 
-	if ((recv_success(sfd, "Error: couldn't authorise!")) < 0)
+	if ((recv_success(sfd, NULL)) < 0)
 		ret = -4;
 
 cleanup:

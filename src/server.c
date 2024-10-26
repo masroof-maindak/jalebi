@@ -16,10 +16,10 @@
  * @brief registers/verifies a user's credentials
  * @return UID on success, negative value on failure
  */
-int get_uid(int cfd, char *buf) {
+int64_t get_uid(int cfd, char *buf) {
 	char mode, un[PW_MAX_LEN + 1], pw[PW_MAX_LEN + 1];
 	uint8_t unL, pwL;
-	int uid = -1;
+	int64_t uid = -1;
 
 	if (recv(cfd, buf, BUFSIZE, 0) == -1) {
 		perror("recv");
@@ -90,8 +90,8 @@ void *handle_client(void *arg) {
 	int cfd, status = 0;
 	enum REQUEST reqType;
 	ssize_t bytesRead;
-	char *buf, udir[BUFSIZE];
-	long uid;
+	char *buf, udir[BUFSIZE] = "\0";
+	int64_t uid;
 
 	if ((buf = malloc(BUFSIZE)) == NULL) {
 		perror("malloc()");

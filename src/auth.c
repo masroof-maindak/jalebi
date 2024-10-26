@@ -1,3 +1,4 @@
+#include <openssl/sha.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,34 +60,25 @@ char *get_salt() {
 }
 
 /**
- * @brief Hashes a string using SHA-256
- */
-void hash_sha256(const char *in, unsigned char out[SHA256_DIGEST_LENGTH]) {
-	SHA256_CTX sha256;
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-	SHA256_Init(&sha256);
-	SHA256_Update(&sha256, in, strlen(in));
-	SHA256_Final(out, &sha256);
-#pragma GCC diagnostic warning "-Wdeprecated-declarations"
-}
-
-/**
  * @brief Concatenates the password and salt
  */
 char *get_salted_pw(const char *pw, const char *salt) {
 	size_t len = strlen(pw) + SALT_LENGTH + 1;
 	char *saltedPw;
+	int n;
 
 	if ((saltedPw = malloc(len)) == NULL) {
 		perror("malloc()");
 		return NULL;
 	}
 
-	if (snprintf(saltedPw, len, "%s%s", pw, salt) < 0) {
+	n = snprintf(saltedPw, len, "%s%s", pw, salt);
+	if (n < 0) {
 		free(saltedPw);
 		return NULL;
 	}
 
+	saltedPw[n] = '\0';
 	return saltedPw;
 }
 
@@ -94,43 +86,47 @@ char *get_salted_pw(const char *pw, const char *salt) {
  * @brief Registers a user in the database
  * @return uid on success, negative on failure
  */
-int register_user(const char *un, const char *pw) {
-	int uid = -1;
-	char *saltedPw, *salt = get_salt();
-	unsigned char hash[SHA256_DIGEST_LENGTH];
+int64_t register_user(const char *un, const char *pw) {
+	int64_t uid = -1;
+	char *pwSalt, *salt = get_salt();
+	sqlite3_stmt *stmt;
 	const char *insertSql =
 		"INSERT INTO users (username, password, salt) VALUES (?, ?, ?);";
-	sqlite3_stmt *stmt;
 
 	if (salt == NULL)
 		return -1;
 
-	if ((saltedPw = get_salted_pw(pw, salt)) == NULL) {
+	if ((pwSalt = get_salted_pw(pw, salt)) == NULL) {
 		free(salt);
 		return -2;
 	}
 
-	hash_sha256(saltedPw, hash);
+	const unsigned char *pwHash =
+		SHA256((const unsigned char *)pwSalt, strlen(pwSalt), NULL);
+
+	puts(pwSalt);
+	printf("%02x\n", pwHash);
 
 	if (sqlite3_prepare_v2(db, insertSql, -1, &stmt, NULL) != SQLITE_OK) {
 		fprintf(stderr, "SQLite error: %s\n", sqlite3_errmsg(db));
-		goto cleanup;
 		uid = -3;
+		goto cleanup;
 	}
 
 	sqlite3_bind_text(stmt, 1, un, -1, SQLITE_STATIC);
-	sqlite3_bind_blob(stmt, 2, hash, SHA256_DIGEST_LENGTH, SQLITE_STATIC);
+	sqlite3_bind_blob(stmt, 2, pwHash, SHA256_DIGEST_LENGTH, SQLITE_STATIC);
 	sqlite3_bind_text(stmt, 3, salt, -1, SQLITE_STATIC);
 
 	if (sqlite3_step(stmt) != SQLITE_DONE) {
 		fprintf(stderr, "SQLite error: %s\n", sqlite3_errmsg(db));
 		uid = -4;
+		goto cleanup;
 	}
 
 	sqlite3_finalize(stmt);
 	uid = sqlite3_last_insert_rowid(db);
 cleanup:
-	free(saltedPw);
+	free(pwSalt);
 	free(salt);
 	return uid;
 }
@@ -139,7 +135,7 @@ cleanup:
  * @brief Verifies a user's credentials
  * @return uid on success, negative on failure
  */
-int verify_user(const char *username, const char *pw) {
+int64_t verify_user(const char *username, const char *pw) {
 	const char *select_sql =
 		"SELECT password, salt, uid FROM users WHERE username = ?;";
 	sqlite3_stmt *stmt;
@@ -157,26 +153,30 @@ int verify_user(const char *username, const char *pw) {
 		return -2; /* user not found or execution error */
 	}
 
-	const unsigned char *dbHashedPw = sqlite3_column_blob(stmt, 0);
-	const char *dbSalt = (const char *)sqlite3_column_text(stmt, 1);
-	const unsigned int uid = sqlite3_column_int(stmt, 2);
+	const unsigned char *dbPwHash = sqlite3_column_blob(stmt, 0);
+	const char *dbSalt			  = (const char *)sqlite3_column_text(stmt, 1);
+	const int64_t uid			  = sqlite3_column_int(stmt, 2);
 
-	char *saltedPw = get_salted_pw(pw, dbSalt);
-	if (saltedPw == NULL) {
+	char *pwSalt = get_salted_pw(pw, dbSalt);
+	if (pwSalt == NULL) {
 		sqlite3_finalize(stmt);
 		return -3;
 	}
 
-	unsigned char hash[SHA256_DIGEST_LENGTH];
-	hash_sha256(saltedPw, hash);
+	const unsigned char *pwHash =
+		SHA256((const unsigned char *)pwSalt, 0, NULL);
 
-	if (!memcmp(dbHashedPw, hash, SHA256_DIGEST_LENGTH)) {
+	puts(pwSalt);
+	printf("%02x\n", dbPwHash);
+	printf("%02x\n", pwHash);
+
+	if (!memcmp(dbPwHash, pwHash, SHA256_DIGEST_LENGTH)) {
 		sqlite3_finalize(stmt);
-		free(saltedPw);
+		free(pwSalt);
 		return -4;
 	}
 
 	sqlite3_finalize(stmt);
-	free(saltedPw);
+	free(pwSalt);
 	return uid;
 }

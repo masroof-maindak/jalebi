@@ -26,7 +26,7 @@ char *generate_salt();
 void hash_sha256(const char *input, unsigned char output[SHA256_DIGEST_LENGTH]);
 char *generate_salted_password(const char *password, const char *salt);
 
-int register_user(const char *username, const char *password);
-int verify_user(const char *username, const char *password);
+int64_t register_user(const char *username, const char *password);
+int64_t verify_user(const char *username, const char *password);
 
 #endif // AUTH_H

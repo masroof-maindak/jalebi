@@ -210,7 +210,8 @@ cleanup:
 }
 
 /**
- * @brief return 0 if we `recv` '$SUCCESS$' from the other side
+ * @detail if we `recv` '$SUCCESS$' from the other side, then return 0, else
+ * print the error message in ERR*
  */
 int recv_success(int sockfd, const char *err) {
 	char msg[BUFSIZE];
@@ -221,7 +222,8 @@ int recv_success(int sockfd, const char *err) {
 	}
 
 	if (!(strncmp(msg, SUCCESS_MSG, sizeof(SUCCESS_MSG)) == 0)) {
-		fprintf(stderr, COL_RED "%s\n" COL_RESET, err);
+		if (err)
+			fprintf(stderr, COL_RED "%s\n" COL_RESET, err);
 		return -2;
 	}
 
