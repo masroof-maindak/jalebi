@@ -13,10 +13,11 @@
 #include "../include/utils.h"
 
 /**
- * @brief verifies a user's credentials and returns their UID
+ * @brief registers/verifies a user's credentials
+ * @return UID on success, negative value on failure
  */
 int get_uid(int cfd, char *buf) {
-	char mode, un[PW_MAX_LEN + 1], pw[PW_MAX_LEN + 1], *msg;
+	char mode, un[PW_MAX_LEN + 1], pw[PW_MAX_LEN + 1];
 	uint8_t unL, pwL;
 	int uid = -1;
 
@@ -24,6 +25,8 @@ int get_uid(int cfd, char *buf) {
 		perror("recv");
 		return -1;
 	}
+
+	puts(buf);
 
 	mode = buf[0], unL = buf[1], pwL = buf[2];
 	if ((mode != 'L' && mode != 'R') ||
@@ -34,20 +37,13 @@ int get_uid(int cfd, char *buf) {
 	memcpy(un, buf + 3, unL);
 	memcpy(pw, buf + 3 + unL, pwL);
 	un[unL] = pw[pwL] = '\0';
-
 	uid = (mode == 'L') ? verify_user(un, pw) : register_user(un, pw);
-	msg = uid < 0 ? FAILURE_MSG : SUCCESS_MSG;
-	
-	if (send(cfd, msg, strlen(msg), 0) != 0) {
-		perror("send");
-		return -5;
-	}
 
 	return uid;
 }
 
 int main() {
-	if (!ensure_srv_dir_exists() || init_db() != 0)
+	if (!ensure_dir_exists(HOSTDIR) || init_db() != 0)
 		return 1;
 
 	int sfd, cfd, ret = 0;
@@ -106,16 +102,27 @@ void *handle_client(void *arg) {
 	}
 
 	cfd = *(int *)arg;
-	if ((uid = get_uid(cfd, buf)) < 0 ||
-		(snprintf(udir, sizeof(udir), "%s/%ld", HOSTDIR, uid)) < 0)
-		goto cleanup;
 
+	/* get uid, make directory, send success/failure */
+	if ((uid = get_uid(cfd, buf)) < 0 ||
+		(snprintf(udir, sizeof(udir), "%s/%ld", HOSTDIR, uid)) < 0 ||
+		!ensure_dir_exists(udir)) {
+		if (send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0) == -1)
+			perror("send()");
+		goto cleanup;
+	} else {
+		if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
+			perror("send()");
+			goto cleanup;
+		}
+	}
+
+	/* loop till user exits */
 	while (status == 0) {
 		if ((bytesRead = recv(cfd, buf, BUFSIZE, 0)) == -1) {
 			perror("recv()");
 			goto cleanup;
 		}
-
 		if (bytesRead == 0) {
 			printf("Client has closed the socket!\n");
 			goto cleanup;
@@ -214,11 +221,11 @@ int serv_wrap_upload(const int cfd, const char *buf, char *udir) {
 			return -2;
 		}
 		return 0;
-	} else {
-		if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
-			perror("send()");
-			return -3;
-		}
+	}
+
+	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
+		perror("send()");
+		return -3;
 	}
 
 	/* TODO: timeout if no response for a while */
@@ -351,10 +358,10 @@ cleanup:
 	return status;
 }
 
-int ensure_srv_dir_exists() {
+int ensure_dir_exists(char *d) {
 	struct stat st = {0};
-	if (stat(HOSTDIR, &st) == -1) {
-		if (mkdir(HOSTDIR, 0700) == -1) {
+	if (stat(d, &st) == -1) {
+		if (mkdir(d, 0700) == -1) {
 			perror("mkdir()");
 			return 0;
 		}

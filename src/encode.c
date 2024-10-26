@@ -5,7 +5,6 @@
 #include "../include/utils.h"
 
 /**
- * @param bytesToEncode len of input str
  * @return < 0 if error else size of ret
  */
 int run_length_encode(const char *str, char *ret, size_t len) {

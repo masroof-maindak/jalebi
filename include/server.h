@@ -8,7 +8,7 @@
 
 void *handle_client(void *arg);
 int init_server_socket(struct sockaddr_in *saddr);
-int ensure_srv_dir_exists();
+int ensure_dir_exists(char *dir);
 __off_t get_used_space(const char *dir);
 
 int serv_wrap_view(int cfd, char *udir);

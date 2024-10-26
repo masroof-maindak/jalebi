@@ -49,7 +49,7 @@ char *double_if_of(char *buf, size_t idx, size_t addition, size_t *size) {
 	return buf;
 }
 
-ssize_t view(char *buf, size_t size, char* dir) {
+ssize_t view(char *buf, size_t size, char *dir) {
 	DIR *d;
 	size_t idx = 0, entSz;
 	int n;
@@ -210,7 +210,7 @@ cleanup:
 }
 
 /**
- *@brief return 0 if we `recv` '%SUCCESS' from the other side
+ * @brief return 0 if we `recv` '$SUCCESS$' from the other side
  */
 int recv_success(int sockfd, const char *err) {
 	char msg[BUFSIZE];

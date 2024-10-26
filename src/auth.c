@@ -37,6 +37,9 @@ int close_db() {
 	return 0;
 }
 
+/**
+ * @brief Generates a random salt
+ */
 char *get_salt() {
 	char *salt;
 	if ((salt = malloc(SALT_LENGTH + 1)) == NULL) {
@@ -55,6 +58,9 @@ char *get_salt() {
 	return salt;
 }
 
+/**
+ * @brief Hashes a string using SHA-256
+ */
 void hash_sha256(const char *in, unsigned char out[SHA256_DIGEST_LENGTH]) {
 	SHA256_CTX sha256;
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
@@ -64,6 +70,9 @@ void hash_sha256(const char *in, unsigned char out[SHA256_DIGEST_LENGTH]) {
 #pragma GCC diagnostic warning "-Wdeprecated-declarations"
 }
 
+/**
+ * @brief Concatenates the password and salt
+ */
 char *get_salted_pw(const char *pw, const char *salt) {
 	size_t len = strlen(pw) + SALT_LENGTH + 1;
 	char *saltedPw;
@@ -81,8 +90,12 @@ char *get_salted_pw(const char *pw, const char *salt) {
 	return saltedPw;
 }
 
+/**
+ * @brief Registers a user in the database
+ * @return uid on success, negative on failure
+ */
 int register_user(const char *un, const char *pw) {
-	int ret = 0;
+	int uid = -1;
 	char *saltedPw, *salt = get_salt();
 	unsigned char hash[SHA256_DIGEST_LENGTH];
 	const char *insertSql =
@@ -102,7 +115,7 @@ int register_user(const char *un, const char *pw) {
 	if (sqlite3_prepare_v2(db, insertSql, -1, &stmt, NULL) != SQLITE_OK) {
 		fprintf(stderr, "SQLite error: %s\n", sqlite3_errmsg(db));
 		goto cleanup;
-		ret = -3;
+		uid = -3;
 	}
 
 	sqlite3_bind_text(stmt, 1, un, -1, SQLITE_STATIC);
@@ -111,16 +124,21 @@ int register_user(const char *un, const char *pw) {
 
 	if (sqlite3_step(stmt) != SQLITE_DONE) {
 		fprintf(stderr, "SQLite error: %s\n", sqlite3_errmsg(db));
-		ret = -4;
+		uid = -4;
 	}
 
 	sqlite3_finalize(stmt);
+	uid = sqlite3_last_insert_rowid(db);
 cleanup:
 	free(saltedPw);
 	free(salt);
-	return ret;
+	return uid;
 }
 
+/**
+ * @brief Verifies a user's credentials
+ * @return uid on success, negative on failure
+ */
 int verify_user(const char *username, const char *pw) {
 	const char *select_sql =
 		"SELECT password, salt, uid FROM users WHERE username = ?;";

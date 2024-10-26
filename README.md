@@ -15,8 +15,8 @@ sudo pacman -S lib32-sqlite lib32-openssl readline libbsd
 
 ### Todo
 
-- [ ] Auth: register\_user should return the UID
-- [ ] Server: authentication; SQLite integration
+- [x] TEST - Auth: register\_user should return the UID
+- [x] FIX - Server: authentication; SQLite integration
 - [ ] Server: file handling thread
     - [ ] Thread queue depending on UID???
 

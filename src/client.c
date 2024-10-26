@@ -25,7 +25,8 @@ int main() {
 	printf(COL_GREEN "Succesfully connected to Jalebi -- %s:%d\n" COL_RESET,
 		   SERVER_IP, SERVER_PORT);
 
-	status = user_authentication(sfd);
+	if (!(status = user_authentication(sfd)))
+		fprintf(stderr, COL_RED "Error: couldn't authenticate user!\n");
 
 	while (status == 0) {
 		userInput = readline("namak-paare > ");
@@ -83,8 +84,9 @@ char *get_password(char *pw, uint8_t *pwLen) {
 			return NULL;
 		}
 
-		*pwLen	  = strlen(pw);
-		pwSuccess = *pwLen >= PW_MIN_LEN && *pwLen <= PW_MAX_LEN;
+		*pwLen = strlen(pw);
+		puts(pw);
+		pwSuccess = (*pwLen >= PW_MIN_LEN && *pwLen <= PW_MAX_LEN);
 	}
 
 	return pw;
@@ -114,6 +116,8 @@ int send_auth_info(int sfd, char mode, const char *pw, const char *un,
 	n = snprintf(buf, sizeof(buf), "%c%d%d%s%s", mode, unL, pwL, un, pw);
 	if (n < 0)
 		return -1;
+
+	puts(buf);
 
 	if (send(sfd, buf, n, 0) == -1) {
 		perror("send()");
