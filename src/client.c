@@ -26,7 +26,8 @@ int main() {
 		   SERVER_IP, SERVER_PORT);
 
 	if ((status = user_authentication(sfd)) != 0)
-		fprintf(stderr, COL_RED "Error: couldn't authenticate user!\n" COL_RESET);
+		fprintf(stderr,
+				COL_RED "Error: couldn't authenticate user!\n" COL_RESET);
 
 	while (status == 0) {
 		userInput = readline("namak-paare > ");
@@ -145,7 +146,7 @@ int user_authentication(int sfd) {
 		goto cleanup;
 	}
 
-	if ((recv_success(sfd, "Error: couldn't authorise!")) < 0)
+	if ((recv_success(sfd, NULL)) < 0)
 		ret = -4;
 
 cleanup:
@@ -278,6 +279,11 @@ int client_wrap_view(int sfd) {
 	if (recv(sfd, &idx, sizeof(idx), 0) == -1) {
 		perror("recv()");
 		return -2;
+	}
+
+	if (!idx) {
+		fprintf(stderr, COL_RED "No files on server\n" COL_RESET);
+		return 0;
 	}
 
 	if ((buf = malloc(idx + 1)) == NULL) {

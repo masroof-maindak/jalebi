@@ -16,10 +16,10 @@
  * @brief registers/verifies a user's credentials
  * @return UID on success, negative value on failure
  */
-int get_uid(int cfd, char *buf) {
+int64_t get_uid(int cfd, char *buf) {
 	char mode, un[PW_MAX_LEN + 1], pw[PW_MAX_LEN + 1];
 	uint8_t unL, pwL;
-	int uid = -1;
+	int64_t uid = -1;
 
 	if (recv(cfd, buf, BUFSIZE, 0) == -1) {
 		perror("recv");
@@ -90,8 +90,8 @@ void *handle_client(void *arg) {
 	int cfd, status = 0;
 	enum REQUEST reqType;
 	ssize_t bytesRead;
-	char *buf, udir[BUFSIZE];
-	long uid;
+	char *buf, udir[BUFSIZE] = "\0";
+	int64_t uid;
 
 	if ((buf = malloc(BUFSIZE)) == NULL) {
 		perror("malloc()");
@@ -321,19 +321,9 @@ int serv_wrap_view(int cfd, char *udir) {
 		return -1;
 	}
 
-	/* error while viewing */
+	/* get list of entries & size */
 	if ((idx = view(ret, BUFSIZE, udir)) < 0) {
-		fprintf(stderr, "Internal error occured while `view`ing!\n");
 		status = -2;
-		goto cleanup;
-	}
-
-	/* no files */
-	if (idx == 0) {
-		if ((send(cfd, VIEW_FAILURE_MSG, sizeof(VIEW_FAILURE_MSG), 0)) == -1) {
-			perror("send()");
-			status = -3;
-		}
 		goto cleanup;
 	}
 
@@ -341,6 +331,10 @@ int serv_wrap_view(int cfd, char *udir) {
 		perror("send()");
 		status = -3;
 	}
+
+	/* no files */
+	if (idx == 0)
+		goto cleanup;
 
 	/* transfer information */
 	for (int i = 0; idx > 0; i++, idx -= BUFSIZE) {
