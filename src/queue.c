@@ -55,6 +55,7 @@ void delete_queue(struct queue *q) {
 	q->elemSize = -1;
 
 	free(q);
+	q = NULL;
 }
 
 void enqueue(struct queue *q, const void *data) {
@@ -78,7 +79,6 @@ void enqueue(struct queue *q, const void *data) {
 
 	memcpy(new->data, data, q->elemSize);
 	q->size++;
-	return;
 }
 
 void dequeue(struct queue *q) {
@@ -93,6 +93,9 @@ void dequeue(struct queue *q) {
 
 	free(rem->data);
 	free(rem);
+
+	rem->data = NULL;
+	rem		  = NULL;
 }
 
 void for_each_data(struct queue *q, void (*fn)(void *)) {
