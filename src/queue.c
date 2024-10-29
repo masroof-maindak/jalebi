@@ -40,11 +40,10 @@ void delete_queue(struct queue *q) {
 	struct node *curr = q->header->next;
 
 	while (curr != q->sentinel) {
-		struct node *prev = curr;
-		curr			  = curr->next;
-
-		free(prev->data);
-		free(prev);
+		struct node *next = curr->next;
+		free(curr->data);
+		free(curr);
+		curr = next;
 	}
 
 	free(q->header);
