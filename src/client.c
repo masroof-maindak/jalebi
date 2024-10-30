@@ -118,7 +118,7 @@ int send_auth_info(int sfd, char mode, const char *pw, const char *un,
 		return -1;
 
 	if (send(sfd, buf, n, 0) == -1) {
-		perror("send()");
+		perror("send() in send_auth_info()");
 		return -2;
 	}
 
@@ -132,8 +132,11 @@ int user_authentication(int sfd) {
 	char *un = NULL, *pw = NULL, opt = select_mode();
 	uint8_t unLen = 0, pwLen = 0, ret = 0;
 
-	if ((pw = malloc(PW_MAX_LEN + 1)) == NULL)
+	pw = malloc(PW_MAX_LEN + 1);
+	if (pw == NULL) {
+		perror("malloc() in user_authentication()");
 		return -1;
+	}
 
 	un = get_username(un, &unLen);
 	if ((pw = get_password(pw, &pwLen)) == NULL) {
@@ -161,7 +164,7 @@ int client_wrap_download(int sfd, const char *buf) {
 
 	/* send download message */
 	if (send(sfd, buf, strlen(buf), 0) == -1) {
-		perror("send()");
+		perror("send() #1 in client_wrap_download()");
 		return -1;
 	}
 
@@ -171,21 +174,19 @@ int client_wrap_download(int sfd, const char *buf) {
 
 	/* tell server we're ready to accept size */
 	if (send(sfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
-		perror("send()");
+		perror("send() #2 in client_wrap_download()");
 		return -2;
 	}
 
 	/* recv size */
 	if (recv(sfd, &fsize, sizeof(fsize), 0) == -1) {
-		perror("recv()");
+		perror("recv() in client_wrap_download()");
 		return -3;
 	}
 
 	/* download file */
-	if (download(fname, fsize, sfd) != 0) {
-		fprintf(stderr, "download()\n");
+	if (download(fname, fsize, sfd) != 0)
 		return -4;
-	}
 
 	return 0;
 }
@@ -195,10 +196,11 @@ char *extract_filename_if_exists(const char *fpath, struct stat *fstat) {
 
 	if (stat(fpath, fstat) != 0) {
 		if (errno == ENOENT) {
-			fprintf(stderr, "Error: file does not exist\n");
+			fprintf(stderr,
+					"extract_filename_if_exists(): non-existent file\n");
 			return NULL;
 		} else {
-			perror("stat()");
+			perror("stat() in extract_filename_if_exists()");
 			return NULL;
 		}
 	}
@@ -235,7 +237,7 @@ int client_wrap_upload(int sfd, const char *buf) {
 		return -2;
 
 	if (send(sfd, msg, n, 0) == -1) {
-		perror("send()");
+		perror("send() #1 in client_wrap_upload()");
 		return -3;
 	}
 
@@ -247,17 +249,15 @@ int client_wrap_upload(int sfd, const char *buf) {
 	/* send fsize */
 	fsize = fstat.st_size;
 	if (send(sfd, &fsize, sizeof(fsize), 0) == -1) {
-		perror("send()");
+		perror("send() #2 in client_wrap_upload()");
 		return -5;
 	}
 
 	if ((recv_success(sfd, "Error: Not enough space available!")) < 0)
 		return -6;
 
-	if (upload(fpath, fsize, sfd) < 0) {
-		perror("upload()");
+	if (upload(fpath, fsize, sfd) < 0)
 		return -7;
-	}
 
 	if ((recv_success(sfd, "Error: something went wrong!")) < 0)
 		return -8;
@@ -272,12 +272,12 @@ int client_wrap_view(int sfd) {
 	char *buf;
 
 	if (send(sfd, "$VIEW$", 6, 0) == -1) {
-		perror("send()");
+		perror("send() in client_wrap_view()");
 		return -1;
 	}
 
 	if (recv(sfd, &idx, sizeof(idx), 0) == -1) {
-		perror("recv()");
+		perror("recv() in client_wrap_view()");
 		return -2;
 	}
 
@@ -287,14 +287,14 @@ int client_wrap_view(int sfd) {
 	}
 
 	if ((buf = malloc(idx + 1)) == NULL) {
-		perror("malloc()");
+		perror("malloc() in client_wrap_view()");
 		return -3;
 	}
 
 	buf[idx] = '\0';
 	for (int i = 0; idx > 0; i++, idx -= BUFSIZE) {
 		if ((recv(sfd, buf + (i << 10), min(BUFSIZE, idx), 0)) == -1) {
-			perror("recv()");
+			perror("recv() in client_wrap_view()");
 			free(buf);
 			return -4;
 		}
@@ -309,7 +309,7 @@ int init_client_socket(struct sockaddr_in *saddr) {
 	int sfd;
 
 	if ((sfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-		perror("socket()");
+		perror("socket() in init_client_socket()");
 		return -1;
 	}
 
@@ -318,12 +318,12 @@ int init_client_socket(struct sockaddr_in *saddr) {
 	memset(saddr->sin_zero, '\0', sizeof(saddr->sin_zero));
 
 	if (inet_pton(AF_INET, SERVER_IP, &saddr->sin_addr) <= 0) {
-		perror("inet_pton()");
+		perror("inet_pton() in init_client_socket()");
 		return -2;
 	}
 
 	if (connect(sfd, (struct sockaddr *)saddr, sizeof(*saddr)) < 0) {
-		perror("connect()");
+		perror("connect() in init_client_socket()");
 		close(sfd);
 		return -3;
 	}

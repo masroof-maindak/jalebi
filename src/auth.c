@@ -12,7 +12,7 @@ static sqlite3 *db;
 int init_db() {
 	int rc;
 	if ((rc = sqlite3_open(DATABASE_PATH, &db))) {
-		fprintf(stderr, "SQLite error: %s\n", sqlite3_errmsg(db));
+		fprintf(stderr, "sqlite3_error() in init_db(): %s\n", sqlite3_errmsg(db));
 		return -1;
 	}
 
@@ -20,7 +20,7 @@ int init_db() {
 	rc		  = sqlite3_exec(db, INIT_SQL, 0, 0, &err);
 
 	if (rc != SQLITE_OK) {
-		fprintf(stderr, "SQLite error: %s\n", err);
+		fprintf(stderr, "sqlite3_exec() in init_db(): %s\n", err);
 		sqlite3_free(err);
 		return -2;
 	}
@@ -31,7 +31,7 @@ int init_db() {
 int close_db() {
 	int rc;
 	if ((rc = sqlite3_close(db)) != SQLITE_OK) {
-		fprintf(stderr, "Couldn't close DB: %s\n", sqlite3_errmsg(db));
+		fprintf(stderr, "sqlite3_close() in close_db(): %s\n", sqlite3_errmsg(db));
 		return -1;
 	}
 	return 0;
@@ -43,7 +43,7 @@ int close_db() {
 char *get_salt() {
 	char *salt;
 	if ((salt = malloc(SALT_LENGTH + 1)) == NULL) {
-		perror("malloc()");
+		perror("malloc() in get_salt()");
 		return NULL;
 	}
 
@@ -64,7 +64,7 @@ char *get_salted_pw(const char *pw, const unsigned char *salt) {
 	char *saltedPw;
 
 	if ((saltedPw = malloc(len)) == NULL) {
-		perror("malloc()");
+		perror("malloc() in get_salted_pw()");
 		return NULL;
 	}
 
@@ -99,7 +99,7 @@ int64_t register_user(const char *un, const char *pw) {
 	SHA256((const unsigned char *)pwSalt, strlen(pwSalt), pwHash);
 
 	if (sqlite3_prepare_v2(db, insertSql, -1, &stmt, NULL) != SQLITE_OK) {
-		fprintf(stderr, "SQLite error: %s\n", sqlite3_errmsg(db));
+		fprintf(stderr, "sqlite3_prepare_v2() in register_user(): %s\n", sqlite3_errmsg(db));
 		uid = -3;
 		goto cleanup;
 	}
@@ -109,7 +109,7 @@ int64_t register_user(const char *un, const char *pw) {
 	sqlite3_bind_text(stmt, 3, salt, -1, SQLITE_STATIC);
 
 	if (sqlite3_step(stmt) != SQLITE_DONE) {
-		fprintf(stderr, "SQLite error: %s\n", sqlite3_errmsg(db));
+		fprintf(stderr, "sqlite3_step() in register_user(): %s\n", sqlite3_errmsg(db));
 		uid = -4;
 		goto cleanup;
 	}
@@ -130,7 +130,8 @@ int64_t verify_user(const char *username, const char *pw) {
 	sqlite3_stmt *stmt;
 
 	if (sqlite3_prepare_v2(db, PW_SELECT_SQL, -1, &stmt, NULL) != SQLITE_OK) {
-		fprintf(stderr, "SQLite error: %s\n", sqlite3_errmsg(db));
+		fprintf(stderr, "sqlite3_prepare_v2() in verify_user(): %s\n",
+				sqlite3_errmsg(db));
 		return -1;
 	}
 

@@ -28,19 +28,19 @@ int main() {
 
 	for (;;) {
 		if ((cfd = accept(sfd, (struct sockaddr *)&caddr, &addrSize)) == -1) {
-			perror("accept()");
+			perror("accept() in main()");
 			ret = 3;
 			goto cleanup;
 		}
 
 		if (pthread_create(&clientThread, NULL, handle_client, &cfd) != 0) {
-			perror("pthread_create()");
+			perror("pthread_create() in main()");
 			ret = 4;
 			goto cleanup;
 		}
 
 		if (pthread_detach(clientThread) != 0) {
-			perror("pthread_detach()");
+			perror("pthread_detach() in main()");
 			ret = 5;
 			goto cleanup;
 		}
@@ -48,7 +48,7 @@ int main() {
 
 cleanup:
 	if ((close(sfd)) == -1) {
-		perror("close(sfd)");
+		perror("close(sfd) in main()");
 		ret = 6;
 	}
 
@@ -67,7 +67,7 @@ void *handle_client(void *arg) {
 	int64_t uid;
 
 	if ((buf = malloc(BUFSIZE)) == NULL) {
-		perror("malloc()");
+		perror("malloc() in handle_client()");
 		pthread_exit(NULL);
 	}
 
@@ -78,11 +78,11 @@ void *handle_client(void *arg) {
 		(snprintf(udir, sizeof(udir), "%s/%ld", HOSTDIR, uid)) < 0 ||
 		!ensure_dir_exists(udir)) {
 		if (send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0) == -1)
-			perror("send()");
+			perror("send() #1 in handle_client()");
 		goto cleanup;
 	} else {
 		if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
-			perror("send()");
+			perror("send() #2 in handle_client()");
 			goto cleanup;
 		}
 	}
@@ -90,7 +90,7 @@ void *handle_client(void *arg) {
 	/* loop till user exits */
 	while (status == 0) {
 		if ((bytesRead = recv(cfd, buf, BUFSIZE, 0)) == -1) {
-			perror("recv()");
+			perror("recv() in handle_client()");
 			goto cleanup;
 		}
 		if (bytesRead == 0) {
@@ -112,7 +112,7 @@ void *handle_client(void *arg) {
 			break;
 		default:
 			if ((send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1) {
-				perror("send()");
+				perror("send() #3 in handle_client()");
 				goto cleanup;
 			}
 		}
@@ -126,7 +126,7 @@ void *handle_client(void *arg) {
 cleanup:
 	free(buf);
 	if ((close(cfd)) == -1)
-		perror("close(cfd)");
+		perror("close(cfd) in handle_client()");
 	pthread_exit(NULL);
 }
 
@@ -134,13 +134,13 @@ int init_server_socket(struct sockaddr_in *saddr) {
 	int sfd, reuse = 1;
 
 	if ((sfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-		perror("socket()");
+		perror("socket() in init_server_socket()");
 		return -1;
 	}
 
 	if ((setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse))) ==
 		-1) {
-		perror("setsockopt(SO_REUSEADDR)");
+		perror("setsockopt(SO_REUSEADDR) in init_server_socket()");
 		return -2;
 	}
 
@@ -150,12 +150,12 @@ int init_server_socket(struct sockaddr_in *saddr) {
 	memset(saddr->sin_zero, '\0', sizeof(saddr->sin_zero));
 
 	if ((bind(sfd, (struct sockaddr *)saddr, sizeof(*saddr))) == -1) {
-		perror("bind()");
+		perror("bind() in init_server_socket()");
 		return -3;
 	}
 
 	if (listen(sfd, MAXCLIENTS) == -1) {
-		perror("listen()");
+		perror("listen() in init_server_socket()");
 		return -4;
 	}
 
@@ -187,14 +187,14 @@ int server_wrap_upload(const int cfd, const char *buf, char *udir) {
 
 	if (stat(fpath, &st) != 0) {
 		if (send(cfd, DLOAD_FAILURE_MSG, sizeof(DLOAD_FAILURE_MSG), 0) == -1) {
-			perror("send()");
+			perror("send() #1 in server_wrap_upload()");
 			return -2;
 		}
 		return 0;
 	}
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
-		perror("send()");
+		perror("send() #2 in server_wrap_upload()");
 		return -3;
 	}
 
@@ -204,14 +204,12 @@ int server_wrap_upload(const int cfd, const char *buf, char *udir) {
 
 	fsize = st.st_size;
 	if (send(cfd, &fsize, sizeof(fsize), 0) == -1) {
-		perror("send()");
+		perror("send() #3 in server_wrap_upload()");
 		return -5;
 	}
 
-	if (upload(fpath, fsize, cfd) < 0) {
-		fprintf(stderr, "upload()\n");
+	if (upload(fpath, fsize, cfd) < 0)
 		return -6;
-	}
 
 	return 0;
 }
@@ -237,14 +235,14 @@ int server_wrap_download(const int cfd, const char *buf, char *udir) {
 	__off_t usedSpace;
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
-		perror("send()");
+		perror("send() #1 in server_wrap_download()");
 		return -2;
 	}
 
 	fname = buf + 8;
 
 	if (recv(cfd, &fsize, sizeof(fsize), 0) == -1) {
-		perror("recv()");
+		perror("recv() in server_wrap_download()");
 		return -3;
 	}
 
@@ -257,12 +255,12 @@ int server_wrap_download(const int cfd, const char *buf, char *udir) {
 
 	if (err) {
 		if (send(cfd, err, strlen(err), 0) == -1)
-			perror("send()");
+			perror("send() #2 in server_wrap_download()");
 		return -4;
 	}
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
-		perror("send()");
+		perror("send() #3 in server_wrap_download()");
 		return -5;
 	}
 
@@ -270,13 +268,11 @@ int server_wrap_download(const int cfd, const char *buf, char *udir) {
 	if (n < 0)
 		return -6;
 
-	if (download(fpath, fsize, cfd) != 0) {
-		fprintf(stderr, "download()\n");
+	if (download(fpath, fsize, cfd) != 0)
 		return -7;
-	}
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
-		perror("send()");
+		perror("send() #4 in server_wrap_download()");
 		return -8;
 	}
 
@@ -289,7 +285,7 @@ int server_wrap_view(int cfd, char *udir) {
 	char *ret;
 
 	if ((ret = malloc(BUFSIZE)) == NULL) {
-		perror("malloc()");
+		perror("malloc() in server_wrap_view()");
 		return -1;
 	}
 
@@ -300,7 +296,7 @@ int server_wrap_view(int cfd, char *udir) {
 	}
 
 	if ((send(cfd, &idx, sizeof(idx), 0)) == -1) {
-		perror("send()");
+		perror("send() #1 in server_wrap_view()");
 		status = -3;
 		goto cleanup;
 	}
@@ -312,7 +308,7 @@ int server_wrap_view(int cfd, char *udir) {
 	/* transfer information */
 	for (int i = 0; idx > 0; i++, idx -= BUFSIZE) {
 		if ((send(cfd, ret + (i << 10), min(BUFSIZE, idx), 0)) == -1) {
-			perror("send()");
+			perror("send() #2 in server_wrap_view()");
 			status = -4;
 			goto cleanup;
 		}
@@ -327,7 +323,7 @@ int ensure_dir_exists(char *d) {
 	struct stat st = {0};
 	if (stat(d, &st) == -1) {
 		if (mkdir(d, 0700) == -1) {
-			perror("mkdir()");
+			perror("mkdir() in ensure_dir_exists()");
 			return 0;
 		}
 	}
@@ -342,7 +338,7 @@ __off_t get_used_space(const char *dir) {
 	DIR *d;
 
 	if ((d = opendir(dir)) == NULL) {
-		perror("opendir()");
+		perror("opendir() in get_used_space()");
 		return -1;
 	}
 
@@ -356,7 +352,7 @@ __off_t get_used_space(const char *dir) {
 		}
 
 		if (stat(fpath, &st) == -1) {
-			perror("stat()");
+			perror("stat() in get_used_space()");
 			closedir(d);
 			return -3;
 		}
@@ -378,7 +374,7 @@ int64_t authenticate_and_get_uid(int cfd, char *buf) {
 	int64_t uid = -1;
 
 	if (recv(cfd, buf, BUFSIZE, 0) == -1) {
-		perror("recv");
+		perror("recv() in authenticate_and_get_uid()");
 		return -1;
 	}
 

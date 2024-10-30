@@ -10,14 +10,14 @@
 
 char *copy_string(const char *str) {
 	if (str == NULL) {
-		fputs("copy_string receieved NULL!\n", stderr);
+		fprintf(stderr, "copy_string receieved NULL\n");
 		return NULL;
 	}
 
 	size_t size = strlen(str);
 	char *copy	= malloc(size + 1);
 	if (copy == NULL) {
-		perror("malloc()");
+		perror("malloc() in copy_string()");
 		return NULL;
 	}
 
@@ -46,7 +46,7 @@ char *double_if_Of(char *buf, size_t idx, size_t add, size_t *size) {
 	if (idx + add > *size) {
 		*size *= 2;
 		if ((tmp = realloc(buf, *size)) == NULL) {
-			perror("realloc()");
+			perror("realloc() in double_if_Of()");
 			free(buf);
 			return NULL;
 		}
@@ -64,7 +64,7 @@ ssize_t view(char *buf, size_t size, char *udir) {
 	struct stat inf;
 
 	if ((d = opendir(udir)) == NULL) {
-		perror("opendir()");
+		perror("opendir() in view()");
 		return -1;
 	}
 
@@ -74,7 +74,7 @@ ssize_t view(char *buf, size_t size, char *udir) {
 
 		sprintf(upath, "%s/%s", udir, ent->d_name);
 		if ((stat(upath, &inf)) != 0) {
-			perror("stat()");
+			perror("stat() in view()");
 			idx = -2;
 			goto cleanup;
 		}
@@ -120,12 +120,12 @@ int download(const char *fname, size_t bytes, int sfd) {
 	char *buf;
 
 	if ((fp = fopen(fname, "w")) == NULL) {
-		perror("fopen()");
+		perror("fopen() in download()");
 		return 1;
 	}
 
 	if ((buf = malloc(BUFSIZE)) == NULL) {
-		perror("malloc()");
+		perror("malloc() in download()");
 		ret = 2;
 		goto cleanup;
 	}
@@ -135,7 +135,7 @@ int download(const char *fname, size_t bytes, int sfd) {
 		toRead = min(BUFSIZE, bytes);
 
 		if ((bytesRead = recv(sfd, buf, toRead, 0)) == -1) {
-			perror("recv()");
+			perror("recv() in download()");
 			ret = 3;
 			goto cleanup;
 		}
@@ -148,7 +148,7 @@ int download(const char *fname, size_t bytes, int sfd) {
 
 		fwrite(buf, bytesRead, 1, fp);
 		if (ferror(fp)) {
-			perror("fwrite()");
+			perror("fwrite() in download()");
 			ret = 5;
 			goto cleanup;
 		}
@@ -173,12 +173,12 @@ int upload(const char *fname, size_t bytes, int sfd) {
 	char *buf;
 
 	if ((fp = fopen(fname, "r")) == NULL) {
-		perror("fopen()");
+		perror("fopen() in upload()");
 		return 1;
 	}
 
 	if ((buf = malloc(BUFSIZE)) == NULL) {
-		perror("malloc()");
+		perror("malloc() in upload()");
 		fclose(fp);
 		return 2;
 	}
@@ -189,7 +189,7 @@ int upload(const char *fname, size_t bytes, int sfd) {
 
 		bytesRead = fread(buf, 1, toWrite, fp);
 		if (ferror(fp)) {
-			perror("fread()");
+			perror("fread() in upload()");
 			ret = 3;
 			goto cleanup;
 		}
@@ -201,7 +201,7 @@ int upload(const char *fname, size_t bytes, int sfd) {
 		}
 
 		if (send(sfd, buf, bytesRead, 0) == -1) {
-			perror("send()");
+			perror("send() in upload()");
 			ret = 5;
 			goto cleanup;
 		}
@@ -223,7 +223,7 @@ int recv_success(int sockfd, const char *err) {
 	char msg[BUFSIZE];
 
 	if (recv(sockfd, msg, sizeof(msg), 0) == -1) {
-		perror("recv()");
+		perror("recv() in recv_success()");
 		return -1;
 	}
 

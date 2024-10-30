@@ -6,20 +6,20 @@
 struct queue *create_queue(size_t elemSize) {
 	struct queue *q = malloc(sizeof(struct queue));
 	if (q == NULL) {
-		perror("malloc()");
+		perror("malloc() in create_queue() - q");
 		return NULL;
 	}
 
 	q->header = malloc(sizeof(struct node));
 	if (q->header == NULL) {
-		perror("malloc()");
+		perror("malloc() in create_queue() - header");
 		free(q);
 		return NULL;
 	}
 
 	q->sentinel = malloc(sizeof(struct node));
 	if (q->sentinel == NULL) {
-		perror("malloc()");
+		perror("malloc() in create_queue() - sentinel");
 		free(q->header);
 		free(q);
 		return NULL;
@@ -61,13 +61,13 @@ void delete_queue(struct queue *q) {
 void enqueue(struct queue *q, const void *data) {
 	struct node *new = malloc(sizeof(struct node));
 	if (new == NULL) {
-		perror("malloc()");
+		perror("malloc() #1 in enqueue()");
 		return;
 	}
 
 	new->data = malloc(sizeof(q->elemSize));
 	if (new->data == NULL) {
-		perror("malloc()");
+		perror("malloc() #2 in enqueue()");
 		return;
 	}
 
