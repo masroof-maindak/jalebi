@@ -92,10 +92,10 @@ void dequeue(struct queue *q) {
 	q->size--;
 
 	free(rem->data);
-	free(rem);
-
 	rem->data = NULL;
-	rem		  = NULL;
+
+	free(rem);
+	rem = NULL;
 }
 
 void for_each_data(struct queue *q, void (*fn)(void *)) {

@@ -26,7 +26,6 @@ int init_db();
 int close_db();
 
 char *generate_salt();
-void hash_sha256(const char *input, unsigned char output[SHA256_DIGEST_LENGTH]);
 char *generate_salted_password(const char *password, const char *salt);
 
 int64_t register_user(const char *username, const char *password);
