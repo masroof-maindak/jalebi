@@ -21,6 +21,7 @@ struct queue *create_queue(size_t elemSize);
 void delete_queue(struct queue *q);
 void enqueue(struct queue *q, const void *data);
 void dequeue(struct queue *q);
+void *top(struct queue *q);
 void for_each_data(struct queue *q, void (*fn)(void *));
 
 #endif // QUEUE_H

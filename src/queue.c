@@ -58,6 +58,11 @@ void delete_queue(struct queue *q) {
 	q = NULL;
 }
 
+/**
+ * @brief adds a ndoe at the end of the queue
+ * @param data must point to a chunk of memory that is the same size as the
+ * argument used to create a queue object
+ */
 void enqueue(struct queue *q, const void *data) {
 	struct node *new = malloc(sizeof(struct node));
 	if (new == NULL) {
@@ -81,21 +86,41 @@ void enqueue(struct queue *q, const void *data) {
 	q->size++;
 }
 
+/**
+ * @brief removes the earliest node added
+ */
 void dequeue(struct queue *q) {
 	if (q->size == 0)
 		return;
 
-	struct node *rem = q->header->next;
-	q->header->next	 = rem->next;
-	rem->next->prev	 = q->header;
+	struct node *n	= q->header->next;
+	q->header->next = n->next;
+	n->next->prev	= q->header;
 
 	q->size--;
 
-	free(rem->data);
-	rem->data = NULL;
+	free(n->data);
+	n->data = NULL;
 
-	free(rem);
-	rem = NULL;
+	free(n);
+	n = NULL;
+}
+
+/**
+ * @brief returns a copy of the value at the head of the queue
+ */
+void *top(struct queue *q) {
+	if (q->size == 0)
+		return NULL;
+
+	void *data = malloc(q->elemSize);
+	if (data == NULL) {
+		perror("malloc() in top()");
+		return NULL;
+	}
+
+	memcpy(data, q->header->next->data, q->elemSize);
+	return data;
 }
 
 void for_each_data(struct queue *q, void (*fn)(void *)) {
