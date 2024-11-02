@@ -10,7 +10,34 @@
 
 #include "../include/auth.h"
 #include "../include/server.h"
-#include "../include/utils.h"
+
+const struct USER_TASK DEFAULT_TASK = {.uid = -1, .rt = INVALID, .msg = NULL};
+
+void *client_handler(void *arg) {
+	/*
+	 * 0. Lock queue mutex
+	 * 1. Pop struct USER_TASK off global task queue unconditionally (if exists)
+	 * 2. Unlock queue mutex
+	 * 3. switch (task) {
+	 * 		case authenticate:
+	 * 			if valid
+	 * 				goto 3
+	 * 			else
+	 * 				send them a failure message
+	 * 		case view|upload:
+	 * 			Set global session info
+	 * 			Upload requested information unconditionally
+	 * 			Unset global session info
+	 * 		case download:
+	 * 			Set global session info
+	 * 			If this user has another ongoing write task, block thread
+	 * 			Unset global session info
+	 * 	}
+	 * 	4. Wait for 60 seconds to recv msg, parse it, and enqueue task
+	 * 	5. If time limit crossed, stop blocking
+	 */
+	return NULL;
+}
 
 int main() {
 	if (!ensure_dir_exists(HOSTDIR) || init_db() != 0)
@@ -25,6 +52,8 @@ int main() {
 
 	if ((sfd = init_server_socket(&saddr)) < 0)
 		return 2;
+
+	/* create thread pool */
 
 	for (;;) {
 		if ((cfd = accept(sfd, (struct sockaddr *)&caddr, &addrSize)) == -1) {
@@ -56,14 +85,17 @@ cleanup:
 	while (close_db() != 0)
 		usleep(100000);
 
+	/* destroy thread pool */
+
 	return ret;
 }
 
+/* TODO: deprecate in favour of client_handler */
 void *handle_client(void *arg) {
 	int cfd = *(int *)arg, status = 0;
-	enum REQUEST reqType;
+	enum REQ_TYPE reqType;
 	ssize_t bytesRead;
-	char *buf, udir[BUFSIZE] = "\0";
+	char *buf, udir[PATH_MAX] = "\0";
 	int64_t uid;
 
 	if ((buf = malloc(BUFSIZE)) == NULL) {
@@ -71,7 +103,7 @@ void *handle_client(void *arg) {
 		pthread_exit(NULL);
 	}
 
-	/* get uid, make directory, and send success/failure */
+	/* get uid, mkdir if needed, and send success/failure */
 	if ((uid = authenticate_and_get_uid(cfd, buf)) < 0 ||
 		(snprintf(udir, sizeof(udir), "%s/%ld", HOSTDIR, uid)) < 0 ||
 		!ensure_dir_exists(udir)) {

@@ -32,10 +32,10 @@
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
-enum REQUEST { VIEW = 1, DOWNLOAD, UPLOAD, INVALID };
+enum REQ_TYPE { VIEW = 1, DOWNLOAD, UPLOAD, INVALID };
 
 char *copy_string(const char *str);
-enum REQUEST identify_request(const char *buf);
+enum REQ_TYPE identify_request(const char *buf);
 int recv_success(int sockfd, const char *err);
 ssize_t view(char *buf, size_t size, char *dir);
 uint8_t get_num_digits(__off_t n);
