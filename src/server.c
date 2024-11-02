@@ -170,7 +170,7 @@ int init_server_socket(struct sockaddr_in *saddr) {
  * 	- Else, send() back it's size
  * 	- Call upload function to send() file until nothing remains
  *
- * @param[buf] the buffer containing the request $DOWNLOAD$<fname>$
+ * @param buf the buffer containing the request $DOWNLOAD$<fname>$
  */
 int server_wrap_upload(const int cfd, const char *buf, char *udir) {
 	size_t fsize;
@@ -225,7 +225,7 @@ int server_wrap_upload(const int cfd, const char *buf, char *udir) {
  * 	  acquired from #2
  * 	- Sends $SUCCESS$ again
  *
- * @param[buf] the buffer containing the request $UPLOAD$<fname>$
+ * @param buf the buffer containing the request $UPLOAD$<fname>$
  */
 int server_wrap_download(const int cfd, const char *buf, char *udir) {
 	size_t fsize;

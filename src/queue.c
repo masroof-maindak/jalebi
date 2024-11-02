@@ -25,13 +25,13 @@ struct queue *create_queue(size_t elemSize) {
 		return NULL;
 	}
 
-	q->header->prev	  = NULL;
-	q->header->next	  = q->sentinel;
-	q->sentinel->next = NULL;
-	q->sentinel->prev = q->header;
+	q->header->data = q->sentinel->data = NULL;
+	q->header->prev = q->sentinel->next = NULL;
 
-	q->size		= 0;
-	q->elemSize = elemSize;
+	q->header->next	  = q->sentinel;
+	q->sentinel->prev = q->header;
+	q->size			  = 0;
+	q->elemSize		  = elemSize;
 
 	return q;
 }
