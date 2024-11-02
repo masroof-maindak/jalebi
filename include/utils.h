@@ -34,6 +34,14 @@
 
 enum REQUEST { VIEW = 1, DOWNLOAD, UPLOAD, INVALID };
 
+struct client_request
+{
+    int id;
+    REQUEST reqType;
+    char* msg;
+};
+
+
 char *copy_string(const char *str);
 enum REQUEST identify_request(const char *buf);
 int recv_success(int sockfd, const char *err);
