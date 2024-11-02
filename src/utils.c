@@ -114,7 +114,7 @@ enum REQUEST identify_request(const char *buf) {
  * @brief download a total of 'bytes' bytes from a socket, into
  * `fname` file
  */
-int download(const char *fname, size_t bytes, int sfd) {
+int download_file(const char *fname, size_t bytes, int sfd) {
 	FILE *fp;
 	int bytesRead, toRead, ret = 0;
 	char *buf;
@@ -167,7 +167,7 @@ cleanup:
  *
  * @note the file's existence must be guaranteed before calling this function
  */
-int upload(const char *fname, size_t bytes, int sfd) {
+int upload_file(const char *fname, size_t bytes, int sfd) {
 	FILE *fp;
 	int bytesRead, toWrite, ret = 0;
 	char *buf;

@@ -60,7 +60,7 @@ cleanup:
 }
 
 void *handle_client(void *arg) {
-	int cfd, status = 0;
+	int cfd = *(int *)arg, status = 0;
 	enum REQUEST reqType;
 	ssize_t bytesRead;
 	char *buf, udir[BUFSIZE] = "\0";
@@ -71,9 +71,7 @@ void *handle_client(void *arg) {
 		pthread_exit(NULL);
 	}
 
-	cfd = *(int *)arg;
-
-	/* get uid, make directory, send success/failure */
+	/* get uid, make directory, and send success/failure */
 	if ((uid = authenticate_and_get_uid(cfd, buf)) < 0 ||
 		(snprintf(udir, sizeof(udir), "%s/%ld", HOSTDIR, uid)) < 0 ||
 		!ensure_dir_exists(udir)) {
@@ -193,6 +191,8 @@ int server_wrap_upload(const int cfd, const char *buf, char *udir) {
 		return 0;
 	}
 
+	fsize = st.st_size;
+
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send() #2 in server_wrap_upload()");
 		return -3;
@@ -202,13 +202,12 @@ int server_wrap_upload(const int cfd, const char *buf, char *udir) {
 	if ((recv_success(cfd, "Client never acknowledged receive")) < 0)
 		return -4;
 
-	fsize = st.st_size;
 	if (send(cfd, &fsize, sizeof(fsize), 0) == -1) {
 		perror("send() #3 in server_wrap_upload()");
 		return -5;
 	}
 
-	if (upload(fpath, fsize, cfd) < 0)
+	if (upload_file(fpath, fsize, cfd) < 0)
 		return -6;
 
 	return 0;
@@ -229,7 +228,6 @@ int server_wrap_upload(const int cfd, const char *buf, char *udir) {
  */
 int server_wrap_download(const int cfd, const char *buf, char *udir) {
 	size_t fsize;
-	int n;
 	char const *fname;
 	char fpath[PATH_MAX], *err = NULL;
 	__off_t usedSpace;
@@ -264,11 +262,10 @@ int server_wrap_download(const int cfd, const char *buf, char *udir) {
 		return -5;
 	}
 
-	n = snprintf(fpath, sizeof(fpath), "%s/%s", udir, fname);
-	if (n < 0)
+	if (snprintf(fpath, sizeof(fpath), "%s/%s", udir, fname) < 0)
 		return -6;
 
-	if (download(fpath, fsize, cfd) != 0)
+	if (download_file(fpath, fsize, cfd) != 0)
 		return -7;
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {

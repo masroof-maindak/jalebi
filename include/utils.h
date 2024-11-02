@@ -40,7 +40,7 @@ ssize_t view(char *buf, size_t size, char *dir);
 char *double_if_Of(char *buf, size_t idx, size_t addition, size_t *size);
 
 /* TODO: take function pointer to encoder/decoder function */
-int download(const char *fname, size_t bytes, int sfd);
-int upload(const char *fname, size_t bytes, int sfd);
+int download_file(const char *fname, size_t bytes, int sfd);
+int upload_file(const char *fname, size_t bytes, int sfd);
 
 #endif // UTILS_H

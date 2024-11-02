@@ -185,7 +185,7 @@ int client_wrap_download(int sfd, const char *buf) {
 	}
 
 	/* download file */
-	if (download(fname, fsize, sfd) != 0)
+	if (download_file(fname, fsize, sfd) != 0)
 		return -4;
 
 	return 0;
@@ -256,7 +256,7 @@ int client_wrap_upload(int sfd, const char *buf) {
 	if ((recv_success(sfd, "Error: Not enough space available!")) < 0)
 		return -6;
 
-	if (upload(fpath, fsize, sfd) < 0)
+	if (upload_file(fpath, fsize, sfd) < 0)
 		return -7;
 
 	if ((recv_success(sfd, "Error: something went wrong!")) < 0)
