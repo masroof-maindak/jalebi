@@ -1,5 +1,4 @@
 #include <dirent.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,7 +25,7 @@ char *copy_string(const char *str) {
 	return copy;
 }
 
-uint32_t get_num_digits(__off_t n) {
+uint8_t get_num_digits(__off_t n) {
 	int r = 1;
 	for (; n > 9; n /= 10, r++)
 		;
@@ -228,8 +227,8 @@ int recv_success(int sockfd, const char *err) {
 	}
 
 	if (!(strncmp(msg, SUCCESS_MSG, sizeof(SUCCESS_MSG)) == 0)) {
-		if (err)
-			fprintf(stderr, COL_RED "%s\n" COL_RESET, err);
+		if (err != NULL)
+			fprintf(stderr, RED "%s\n" RESET, err);
 		return -2;
 	}
 

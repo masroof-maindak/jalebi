@@ -1,6 +1,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <linux/limits.h>
+#include <stdint.h>
 #include <sys/types.h>
 
 #define PW_MAX_LEN		  31
@@ -14,14 +16,14 @@
 #define VIEW_FAILURE_MSG  "$FAILURE$NO_CLIENT_DATA$\n"
 #define DLOAD_FAILURE_MSG "$FAILURE$FILE_NOT_FOUND$\n"
 
-#define COL_RESET	"\x1b[0m"
-#define COL_RED		"\x1b[31m"
-#define COL_GREEN	"\x1b[32m"
-#define COL_YELLOW	"\x1b[33m"
-#define COL_BLUE	"\x1b[34m"
-#define COL_MAGENTA "\x1b[35m"
-#define COL_CYAN	"\x1b[36m"
-#define COL_WHITE	"\x1b[37m"
+#define RESET	"\x1b[0m"
+#define RED		"\x1b[31m"
+#define GREEN	"\x1b[32m"
+#define YELLOW	"\x1b[33m"
+#define BLUE	"\x1b[34m"
+#define MAGENTA "\x1b[35m"
+#define CYAN	"\x1b[36m"
+#define WHITE	"\x1b[37m"
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096
@@ -36,6 +38,7 @@ char *copy_string(const char *str);
 enum REQUEST identify_request(const char *buf);
 int recv_success(int sockfd, const char *err);
 ssize_t view(char *buf, size_t size, char *dir);
+uint8_t get_num_digits(__off_t n);
 
 char *double_if_Of(char *buf, size_t idx, size_t addition, size_t *size);
 

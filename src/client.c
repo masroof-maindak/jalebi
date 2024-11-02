@@ -22,12 +22,12 @@ int main() {
 	if ((sfd = init_client_socket(&saddr)) < 0)
 		return 1;
 
-	printf(COL_GREEN "Succesfully connected to Jalebi -- %s:%d\n" COL_RESET,
+	printf(GREEN "Succesfully connected to Jalebi -- %s:%d\n" RESET,
 		   SERVER_IP, SERVER_PORT);
 
 	if ((status = user_authentication(sfd)) != 0)
 		fprintf(stderr,
-				COL_RED "Error: couldn't authenticate user!\n" COL_RESET);
+				RED "Error: couldn't authenticate user!\n" RESET);
 
 	while (status == 0) {
 		userInput = readline("namak-paare > ");
@@ -262,7 +262,7 @@ int client_wrap_upload(int sfd, const char *buf) {
 	if ((recv_success(sfd, "Error: something went wrong!")) < 0)
 		return -8;
 
-	printf(COL_GREEN "File uploaded to server successfully!\n" COL_RESET);
+	printf(GREEN "File uploaded to server successfully!\n" RESET);
 	return 0;
 }
 
@@ -282,7 +282,7 @@ int client_wrap_view(int sfd) {
 	}
 
 	if (!idx) {
-		fprintf(stderr, COL_RED "No files on server\n" COL_RESET);
+		fprintf(stderr, RED "No files on server\n" RESET);
 		return 0;
 	}
 
@@ -341,12 +341,12 @@ enum REQUEST handle_input(char *userInput) {
 		return -1;
 
 	if ((reqType = identify_request(userInput)) == -1) {
-		fprintf(stderr, "%sError: invalid command!%s\n", COL_RED, COL_RESET);
+		fprintf(stderr, "%sError: invalid command!%s\n", RED, RESET);
 		return -2;
 	}
 
 	if (!valid_user_input(userInput, reqType, len)) {
-		fprintf(stderr, "%sError: invalid format!%s\n", COL_RED, COL_RESET);
+		fprintf(stderr, "%sError: invalid format!%s\n", RED, RESET);
 		return -3;
 	}
 
