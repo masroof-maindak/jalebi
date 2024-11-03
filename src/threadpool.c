@@ -6,7 +6,7 @@
 /**
  * @brief create `n` threads, running `fp` function
  */
-struct tpool *create_threadpool(const uint16_t n, void *(*fp)(void *)) {
+struct tpool *create_threadpool(uint16_t n, void *(*fp)(void *)) {
 	if (n == 0)
 		return NULL;
 
@@ -17,7 +17,7 @@ struct tpool *create_threadpool(const uint16_t n, void *(*fp)(void *)) {
 	}
 
 	tp->size	= n;
-	tp->threads = malloc((sizeof(tp->threads) * n) + 1);
+	tp->threads = malloc(sizeof(tp->threads) * n);
 	if (tp->threads == NULL) {
 		perror("malloc() in create_tp() - threads");
 		free(tp);
@@ -32,7 +32,7 @@ struct tpool *create_threadpool(const uint16_t n, void *(*fp)(void *)) {
 		}
 
 		if (pthread_detach(tp->threads[i]) != 0) {
-			perror("pthread_create() in create_tp()");
+			perror("pthread_detach() in create_tp()");
 			return NULL;
 		}
 	}

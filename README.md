@@ -21,8 +21,7 @@ sudo apt install libsqlite3-dev libssl-dev libreadline-dev libbsd-dev
 
 ### Todo
 
-- [x] Server: threadpool w/ queue
-- [ ] Producer-consumer problem
+- [x] Producer-consumer problem
 - [ ] Global session management
 
 ---
