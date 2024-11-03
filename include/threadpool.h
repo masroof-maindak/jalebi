@@ -1,13 +1,16 @@
-#ifndef BOOL_H
-#define BOOL_H
+#ifndef THREADPOOL_H
+#define THREADPOOL_H
 
 #include <pthread.h>
+#include <stdint.h>
 
-struct THREADPOOL {
-	pthread_t *tp;
+/* TODO: power of 2 */
+struct tpool {
+	uint16_t size;
+	pthread_t *threads;
 };
 
-struct THREADPOOL *create_tp(int n);
-void *delete_tp(struct THREADPOOL *tp);
+struct tpool *create_threadpool(const uint16_t n, void *(*fp)(void *));
+void delete_threadpool(struct tpool *tp);
 
-#endif // BOOL_H
+#endif // THREADPOOL_H_H

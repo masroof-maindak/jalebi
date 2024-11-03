@@ -20,7 +20,10 @@ sudo pacman -S lib32-sqlite lib32-openssl readline libbsd
 ---
 
 - [ ] close() -> shutdown() for sockets ???
-- [ ] Signal handlers; gracefully deal w/ sockets/readline(?)/ database
+- [ ] Signal handlers; gracefully deal w/ sockets/readline(?)/database/threadpool (most important)
+
+---
+
 - [ ] encoding/decoding
     - [ ] use an algorithm that guarantees a smaller result
     - [ ] function pointer-ed upload and download logic

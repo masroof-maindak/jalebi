@@ -42,7 +42,6 @@ uint8_t get_num_digits(__off_t n);
 
 char *double_if_Of(char *buf, size_t idx, size_t addition, size_t *size);
 
-/* TODO: take function pointer to encoder/decoder function */
 int download_file(const char *fname, size_t bytes, int sfd);
 int upload_file(const char *fname, size_t bytes, int sfd);
 
