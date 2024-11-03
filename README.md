@@ -13,7 +13,7 @@
 sudo pacman -S lib32-sqlite lib32-openssl readline libbsd
 ```
 
-#### Debain
+#### Debian
 
 ```bash
 sudo apt install libsqlite3-dev libssl-dev libreadline-dev libbsd-dev
