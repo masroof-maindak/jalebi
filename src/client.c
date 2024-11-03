@@ -339,7 +339,7 @@ enum REQ_TYPE handle_input(char *userInput) {
 	else if (strlen(userInput) == 0)
 		return -1;
 
-	if ((reqType = identify_request(userInput)) == -1) {
+	if ((reqType = identify_req_type(userInput)) == -1) {
 		fprintf(stderr, "%sError: invalid command!%s\n", RED, RESET);
 		return -2;
 	}
