@@ -54,7 +54,11 @@ char *double_if_Of(char *buf, size_t idx, size_t add, size_t *size) {
 	return buf;
 }
 
-ssize_t view(char *buf, size_t size, char *udir) {
+/**
+ * @brief store information of the files in a `udir` directory, into a buffer,
+ * `buf`, of `size` size; reallocating it if neccessary
+ */
+ssize_t view(char *buf, size_t size, const char *udir) {
 	DIR *d;
 	size_t idx = 0, entLen;
 	int n;
@@ -99,7 +103,7 @@ cleanup:
 	return idx;
 }
 
-enum REQ_TYPE identify_request(const char *buf) {
+enum REQ_TYPE identify_req_type(const char *buf) {
 	if (!strncmp(buf, "$VIEW$", 6))
 		return VIEW;
 	else if (!strncmp(buf, "$DOWNLOAD$", 10))
