@@ -15,19 +15,18 @@
 
 int main() {
 	int sfd, status = 0;
-	enum REQUEST reqType;
+	enum REQ_TYPE reqType;
 	struct sockaddr_in saddr;
 	char *userInput = NULL;
 
 	if ((sfd = init_client_socket(&saddr)) < 0)
 		return 1;
 
-	printf(GREEN "Succesfully connected to Jalebi -- %s:%d\n" RESET,
-		   SERVER_IP, SERVER_PORT);
+	printf(GREEN "Succesfully connected to Jalebi -- %s:%d\n" RESET, SERVER_IP,
+		   SERVER_PORT);
 
 	if ((status = user_authentication(sfd)) != 0)
-		fprintf(stderr,
-				RED "Error: couldn't authenticate user!\n" RESET);
+		fprintf(stderr, RED "Error: couldn't authenticate user!\n" RESET);
 
 	while (status == 0) {
 		userInput = readline("namak-paare > ");
@@ -331,7 +330,7 @@ int init_client_socket(struct sockaddr_in *saddr) {
 	return sfd;
 }
 
-enum REQUEST handle_input(char *userInput) {
+enum REQ_TYPE handle_input(char *userInput) {
 	size_t len	= strlen(userInput);
 	int reqType = -1;
 
@@ -354,7 +353,7 @@ enum REQUEST handle_input(char *userInput) {
 	return reqType;
 }
 
-uint8_t valid_user_input(const char *input, enum REQUEST reqType, size_t len) {
+uint8_t valid_user_input(const char *input, enum REQ_TYPE reqType, size_t len) {
 	switch (reqType) {
 	case VIEW:
 		return input[6] == '\0';

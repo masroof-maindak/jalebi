@@ -9,123 +9,165 @@
 #include <unistd.h>
 
 #include "../include/auth.h"
+#include "../include/queue.h"
 #include "../include/server.h"
-#include "../include/utils.h"
+#include "../include/threadpool.h"
 
-int main() {
-	if (!ensure_dir_exists(HOSTDIR) || init_db() != 0)
-		return 1;
+struct tpool *tp	   = NULL;
+struct queue *q		   = NULL;
+pthread_mutex_t EnqMut = PTHREAD_MUTEX_INITIALIZER;
 
-	int sfd, cfd, ret = 0;
-	struct sockaddr_in saddr, caddr;
-	socklen_t addrSize = sizeof(caddr);
-	pthread_t clientThread;
-
-	printf("Listening on port %d...\n", SERVER_PORT);
-
-	if ((sfd = init_server_socket(&saddr)) < 0)
-		return 2;
+void *handle_client(void *arg __attribute__((unused))) {
 
 	for (;;) {
-		if ((cfd = accept(sfd, (struct sockaddr *)&caddr, &addrSize)) == -1) {
-			perror("accept() in main()");
-			ret = 3;
-			goto cleanup;
+		/* TODO: synchronisation; only pick up task if available */
+		// ---
+		int cfd = *(int *)top(q);
+		dequeue(q);
+		// ---
+
+		char *buf = NULL, udir[PATH_MAX] = "\0";
+		ssize_t n;
+		int status = 0;
+		int64_t uid;
+
+		if ((buf = malloc(BUFSIZE)) == NULL) {
+			perror("malloc() in handle_client()");
+			continue;
 		}
 
-		if (pthread_create(&clientThread, NULL, handle_client, &cfd) != 0) {
-			perror("pthread_create() in main()");
-			ret = 4;
+		/* get uid, mkdir if needed, and send success/failure */
+		if ((uid = authenticate_and_get_uid(cfd, buf)) < 0 ||
+			(snprintf(udir, sizeof(udir), "%s/%ld", HOSTDIR, uid)) < 0 ||
+			!ensure_dir_exists(udir)) {
+			if (send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0) == -1)
+				perror("send() #1 in handle_client()");
 			goto cleanup;
-		}
-
-		if (pthread_detach(clientThread) != 0) {
-			perror("pthread_detach() in main()");
-			ret = 5;
-			goto cleanup;
-		}
-	}
-
-cleanup:
-	if ((close(sfd)) == -1) {
-		perror("close(sfd) in main()");
-		ret = 6;
-	}
-
-	/* CHECK */
-	while (close_db() != 0)
-		usleep(100000);
-
-	return ret;
-}
-
-void *handle_client(void *arg) {
-	int cfd = *(int *)arg, status = 0;
-	enum REQUEST reqType;
-	ssize_t bytesRead;
-	char *buf, udir[BUFSIZE] = "\0";
-	int64_t uid;
-
-	if ((buf = malloc(BUFSIZE)) == NULL) {
-		perror("malloc() in handle_client()");
-		pthread_exit(NULL);
-	}
-
-	/* get uid, make directory, and send success/failure */
-	if ((uid = authenticate_and_get_uid(cfd, buf)) < 0 ||
-		(snprintf(udir, sizeof(udir), "%s/%ld", HOSTDIR, uid)) < 0 ||
-		!ensure_dir_exists(udir)) {
-		if (send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0) == -1)
-			perror("send() #1 in handle_client()");
-		goto cleanup;
-	} else {
-		if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
-			perror("send() #2 in handle_client()");
-			goto cleanup;
-		}
-	}
-
-	/* loop till user exits */
-	while (status == 0) {
-		if ((bytesRead = recv(cfd, buf, BUFSIZE, 0)) == -1) {
-			perror("recv() in handle_client()");
-			goto cleanup;
-		}
-		if (bytesRead == 0) {
-			printf("Client has closed the socket!\n");
-			goto cleanup;
-		}
-
-		reqType = identify_request(buf);
-
-		switch (reqType) {
-		case VIEW:
-			status = server_wrap_view(cfd, udir);
-			break;
-		case DOWNLOAD:
-			status = server_wrap_upload(cfd, buf, udir);
-			break;
-		case UPLOAD:
-			status = server_wrap_download(cfd, buf, udir);
-			break;
-		default:
-			if ((send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1) {
-				perror("send() #3 in handle_client()");
+		} else {
+			if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
+				perror("send() #2 in handle_client()");
 				goto cleanup;
 			}
 		}
 
-		memset(buf, 0, BUFSIZE);
+		while (status == 0) {
+			if ((n = recv(cfd, buf, BUFSIZE, 0)) == -1) {
+				perror("recv() in handle_client()");
+				goto cleanup;
+			}
 
-		if (status != 0)
-			fprintf(stderr, "Internal error occured in threaded operation!\n");
+			if (n == 0) {
+				printf("Client has closed the socket!\n");
+				close(cfd);
+				goto cleanup;
+			}
+
+			enum REQ_TYPE rt = identify_request(buf);
+
+			/* TODO: Set global session info */
+			if (rt != INVALID) {
+				;
+			}
+
+			switch (rt) {
+			case VIEW:
+				status = server_wrap_view(cfd, udir);
+				break;
+			case UPLOAD:
+				/*  TODO: If this user has another UPLOAD, block thread */
+				status = server_wrap_download(cfd, buf, udir);
+				break;
+			case DOWNLOAD:
+				status = server_wrap_upload(cfd, buf, udir);
+				break;
+			case INVALID:
+				if ((send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1) {
+					perror("send() #3 in handle_client()");
+					goto cleanup;
+				}
+				break;
+			}
+
+			/* TODO: Unset global session info */
+			if (rt != INVALID) {
+				;
+			}
+
+			if (status != 0)
+				fprintf(stderr, "Error ocurred in threaded operation\n");
+		}
+
+	cleanup:
+		free(buf);
+		if (close(cfd) == -1)
+			perror("close(cfd) in handle_client");
+	}
+
+	return NULL;
+}
+
+int main() {
+	int sfd, cfd, ret;
+	struct sockaddr_in saddr, caddr;
+	socklen_t len = sizeof(caddr);
+
+	if ((ret = init(&sfd, &saddr)) != 0)
+		goto cleanup;
+
+	printf("Listening on port %d...\n", SERVER_PORT);
+
+	for (;;) {
+		if ((cfd = accept(sfd, (struct sockaddr *)&caddr, &len)) == -1) {
+			perror("accept() in main()");
+			goto cleanup;
+		}
+
+		pthread_mutex_lock(&EnqMut);
+		enqueue(q, (void *)(&cfd));
+		pthread_mutex_unlock(&EnqMut);
 	}
 
 cleanup:
-	free(buf);
-	if ((close(cfd)) == -1)
-		perror("close(cfd) in handle_client()");
-	pthread_exit(NULL);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
+	switch (ret) {
+	case 0:
+		delete_queue(q);
+	case 4:
+		delete_threadpool(tp);
+	case 3:
+		if ((close(sfd)) == -1) {
+			perror("close(sfd)");
+		}
+	case 2:
+		/* is this right... ? */
+		while (close_db() != 0)
+			usleep(100000);
+	case 1:
+		break;
+	}
+#pragma GCC diagnostic pop
+
+	pthread_mutex_destroy(&EnqMut);
+	return ret;
+}
+
+int init(int *sfd, struct sockaddr_in *saddr) {
+	if (ensure_dir_exists(HOSTDIR) == false || init_db() != 0)
+		return 1;
+
+	if ((*sfd = init_server_socket(saddr)) < 0)
+		return 2;
+
+	tp = create_threadpool(MAXCLIENTS, handle_client);
+	if (tp == NULL)
+		return 3;
+
+	q = create_queue(sizeof(int));
+	if (q == NULL)
+		return 4;
+
+	return 0;
 }
 
 int init_server_socket(struct sockaddr_in *saddr) {
@@ -316,15 +358,15 @@ cleanup:
 	return status;
 }
 
-int ensure_dir_exists(char *d) {
+bool ensure_dir_exists(char *d) {
 	struct stat st = {0};
 	if (stat(d, &st) == -1) {
 		if (mkdir(d, 0700) == -1) {
 			perror("mkdir() in ensure_dir_exists()");
-			return 0;
+			return false;
 		}
 	}
-	return 1;
+	return true;
 }
 
 __off_t get_used_space(const char *dir) {

@@ -99,7 +99,7 @@ cleanup:
 	return idx;
 }
 
-enum REQUEST identify_request(const char *buf) {
+enum REQ_TYPE identify_request(const char *buf) {
 	if (!strncmp(buf, "$VIEW$", 6))
 		return VIEW;
 	else if (!strncmp(buf, "$DOWNLOAD$", 10))

@@ -9,9 +9,9 @@
 #define USER_INPUT_LIMIT 128
 #define RESPONSE_LIMIT	 128
 
-enum REQUEST handle_input(char *userInput);
+enum REQ_TYPE handle_input(char *userInput);
 int init_client_socket(struct sockaddr_in *saddr);
-uint8_t valid_user_input(const char *input, enum REQUEST reqType, size_t len);
+uint8_t valid_user_input(const char *input, enum REQ_TYPE reqType, size_t len);
 char *extract_filename_if_exists(const char *fpath, struct stat *fstat);
 
 char select_mode();

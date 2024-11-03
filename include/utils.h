@@ -32,7 +32,7 @@
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
-enum REQUEST { VIEW = 1, DOWNLOAD, UPLOAD, INVALID };
+enum REQ_TYPE { VIEW = 1, DOWNLOAD, UPLOAD, INVALID };
 
 struct client_request
 {
@@ -43,14 +43,13 @@ struct client_request
 
 
 char *copy_string(const char *str);
-enum REQUEST identify_request(const char *buf);
+enum REQ_TYPE identify_request(const char *buf);
 int recv_success(int sockfd, const char *err);
 ssize_t view(char *buf, size_t size, char *dir);
 uint8_t get_num_digits(__off_t n);
 
 char *double_if_Of(char *buf, size_t idx, size_t addition, size_t *size);
 
-/* TODO: take function pointer to encoder/decoder function */
 int download_file(const char *fname, size_t bytes, int sfd);
 int upload_file(const char *fname, size_t bytes, int sfd);
 
