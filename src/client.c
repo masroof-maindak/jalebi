@@ -366,7 +366,7 @@ uint8_t valid_user_input(const char *input, enum REQ_TYPE reqType, size_t len) {
 		if (input[len - 1] == '$' && len > 9 && input[8] != '$')
 			return 1;
 		break;
-	case LOGIN:
+	case INVALID:
 		break;
 	}
 

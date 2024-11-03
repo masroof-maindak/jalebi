@@ -63,7 +63,9 @@ void *handle_client(void *arg __attribute__((unused))) {
 			}
 
 			enum REQ_TYPE rt = identify_request(buf);
-			if (rt != INVALID) { /*  TODO: Set global session info */
+
+			/* TODO: Set global session info */
+			if (rt != INVALID) {
 				;
 			}
 
@@ -86,7 +88,8 @@ void *handle_client(void *arg __attribute__((unused))) {
 				break;
 			}
 
-			if (rt != INVALID) { /*  TODO: Unset global session info */
+			/* TODO: Unset global session info */
+			if (rt != INVALID) {
 				;
 			}
 
