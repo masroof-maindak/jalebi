@@ -15,12 +15,14 @@ sudo pacman -S lib32-sqlite lib32-openssl readline libbsd
 
 ### Todo
 
-- [ ] Server: threadpool w/ queue
+- [x] Server: threadpool w/ queue
+- [ ] Producer-consumer problem
+- [ ] Global session management
 
 ---
 
 - [ ] close() -> shutdown() for sockets ???
-- [ ] Signal handlers; gracefully deal w/ sockets/readline(?)/database/threadpool (most important)
+- [ ] Signal handlers; gracefully deal w/ sockets/readline(?)/database/threadpool (!!!)
 
 ---
 
