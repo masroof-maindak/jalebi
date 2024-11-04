@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <semaphore.h>
 #include <unistd.h>
 
 #include "../include/auth.h"
@@ -16,15 +17,18 @@
 struct tpool *tp	   = NULL;
 struct queue *q		   = NULL;
 pthread_mutex_t EnqMut = PTHREAD_MUTEX_INITIALIZER;
+sem_t empty;
+sem_t filled;
 
 void *handle_client(void *arg __attribute__((unused))) {
 
 	for (;;) {
-		/* TODO: synchronisation; only pick up task if available */
-		// ---
+		sem_wait(&filled);
+		pthread_mutex_lock(&EnqMut);
 		int cfd = *(int *)top(q);
 		dequeue(q);
-		// ---
+		pthread_mutex_unlock(&EnqMut);
+		sem_post(&empty);
 
 		char *buf = NULL, udir[PATH_MAX] = "\0";
 		ssize_t n;
@@ -121,10 +125,12 @@ int main() {
 			perror("accept() in main()");
 			goto cleanup;
 		}
-
+		
+		sem_wait(&empty);
 		pthread_mutex_lock(&EnqMut);
 		enqueue(q, (void *)(&cfd));
 		pthread_mutex_unlock(&EnqMut);
+		sem_post(&filled);
 	}
 
 cleanup:
@@ -149,6 +155,8 @@ cleanup:
 #pragma GCC diagnostic pop
 
 	pthread_mutex_destroy(&EnqMut);
+	sem_destroy(&empty);
+	sem_destroy(&filled);
 	return ret;
 }
 
@@ -166,6 +174,9 @@ int init(int *sfd, struct sockaddr_in *saddr) {
 	q = create_queue(sizeof(int));
 	if (q == NULL)
 		return 4;
+
+	sem_init(&empty, 0, MAXCLIENTS);
+	sem_init(&filled, 0, 0);
 
 	return 0;
 }
