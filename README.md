@@ -13,14 +13,21 @@
 sudo pacman -S lib32-sqlite lib32-openssl readline libbsd
 ```
 
+#### Debian
+
+```bash
+sudo apt install libsqlite3-dev libssl-dev libreadline-dev libbsd-dev
+```
+
 ### Todo
 
-- [ ] Server: threadpool w/ queue
+- [x] Producer-consumer problem
+- [ ] Global session management
 
 ---
 
 - [ ] close() -> shutdown() for sockets ???
-- [ ] Signal handlers; gracefully deal w/ sockets/readline(?)/database/threadpool (most important)
+- [ ] Signal handlers; gracefully deal w/ sockets/readline(?)/database/threadpool (!!!)
 
 ---
 

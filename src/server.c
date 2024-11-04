@@ -43,7 +43,7 @@ void *handle_client(void *arg __attribute__((unused))) {
 		/* get uid, mkdir if needed, and send success/failure */
 		if ((uid = authenticate_and_get_uid(cfd, buf)) < 0 ||
 			(snprintf(udir, sizeof(udir), "%s/%ld", HOSTDIR, uid)) < 0 ||
-			!ensure_dir_exists(udir)) {
+			ensure_dir_exists(udir) == false) {
 			if (send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0) == -1)
 				perror("send() #1 in handle_client()");
 			goto cleanup;
@@ -55,18 +55,21 @@ void *handle_client(void *arg __attribute__((unused))) {
 		}
 
 		while (status == 0) {
-			if ((n = recv(cfd, buf, BUFSIZE, 0)) == -1) {
+
+			n = recv(cfd, buf, BUFSIZE, 0);
+			switch (n) {
+			case -1:
 				perror("recv() in handle_client()");
 				goto cleanup;
-			}
-
-			if (n == 0) {
+			case 0:
 				printf("Client has closed the socket!\n");
 				close(cfd);
 				goto cleanup;
+			default:
+				break;
 			}
 
-			enum REQ_TYPE rt = identify_request(buf);
+			enum REQ_TYPE rt = identify_req_type(buf);
 
 			/* TODO: Set global session info */
 			if (rt != INVALID) {
@@ -223,21 +226,19 @@ int init_server_socket(struct sockaddr_in *saddr) {
  *
  * @param buf the buffer containing the request $DOWNLOAD$<fname>$
  */
-int server_wrap_upload(const int cfd, const char *buf, char *udir) {
+int server_wrap_upload(int cfd, const char *buf, const char *udir) {
 	size_t fsize;
 	char const *fname;
 	char fpath[PATH_MAX];
-	int n;
 	struct stat st;
 
 	fname = buf + 10;
-	n	  = snprintf(fpath, sizeof(fpath), "%s/%s", udir, fname);
 
-	if (n < 0)
+	if (snprintf(fpath, sizeof(fpath), "%s/%s", udir, fname) < 0)
 		return -1;
 
 	if (stat(fpath, &st) != 0) {
-		if (send(cfd, DLOAD_FAILURE_MSG, sizeof(DLOAD_FAILURE_MSG), 0) == -1) {
+		if (send(cfd, DLOAD_FAIL_MSG, sizeof(DLOAD_FAIL_MSG), 0) == -1) {
 			perror("send() #1 in server_wrap_upload()");
 			return -2;
 		}
@@ -279,7 +280,7 @@ int server_wrap_upload(const int cfd, const char *buf, char *udir) {
  *
  * @param buf the buffer containing the request $UPLOAD$<fname>$
  */
-int server_wrap_download(const int cfd, const char *buf, char *udir) {
+int server_wrap_download(int cfd, const char *buf, const char *udir) {
 	size_t fsize;
 	char const *fname;
 	char fpath[PATH_MAX], *err = NULL;
@@ -304,7 +305,7 @@ int server_wrap_download(const int cfd, const char *buf, char *udir) {
 	else if (usedSpace + fsize > MAX_CLIENT_SPACE)
 		err = ULOAD_FAILURE_MSG;
 
-	if (err) {
+	if (err != NULL) {
 		if (send(cfd, err, strlen(err), 0) == -1)
 			perror("send() #2 in server_wrap_download()");
 		return -4;
@@ -329,7 +330,7 @@ int server_wrap_download(const int cfd, const char *buf, char *udir) {
 	return 0;
 }
 
-int server_wrap_view(int cfd, char *udir) {
+int server_wrap_view(int cfd, const char *udir) {
 	int status = 0;
 	ssize_t idx;
 	char *ret;

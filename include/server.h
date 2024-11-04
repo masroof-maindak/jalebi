@@ -14,8 +14,8 @@ __off_t get_used_space(const char *dir);
 int64_t authenticate_and_get_uid(int cfd, char *buf);
 int init(int *sfd, struct sockaddr_in *saddr);
 
-int server_wrap_view(int cfd, char *udir);
-int server_wrap_upload(int cfd, const char *buf, char *udir);
-int server_wrap_download(int cfd, const char *buf, char *udir);
+int server_wrap_view(int cfd, const char *udir);
+int server_wrap_upload(int cfd, const char *buf, const char *udir);
+int server_wrap_download(int cfd, const char *buf, const char *udir);
 
 #endif // SERVER_H
