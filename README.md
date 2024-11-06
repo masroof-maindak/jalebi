@@ -21,11 +21,13 @@ sudo apt install libsqlite3-dev libssl-dev libreadline-dev libbsd-dev
 
 ### Todo
 
-- [x] Producer-consumer problem
-- [ ] Global session management
+- [ ] Architectural changes suggested on 2024-11-04
+- [ ] Producer-consumer problem
+- [ ] Global session management?
 
 ---
 
+- [ ] Thread monitoring - Restart killed threads, etc.
 - [ ] close() -> shutdown() for sockets ???
 - [ ] Signal handlers; gracefully deal w/ sockets/readline(?)/database/threadpool (!!!)
 
