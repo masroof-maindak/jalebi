@@ -70,7 +70,7 @@ void enqueue(struct queue *q, const void *data) {
 		return;
 	}
 
-	new->data = malloc(sizeof(q->elemSize));
+	new->data = malloc(q->elemSize);
 	if (new->data == NULL) {
 		perror("malloc() #2 in enqueue()");
 		return;
