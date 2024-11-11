@@ -25,8 +25,8 @@
 int init_db();
 int close_db();
 
-char *generate_salt();
-char *generate_salted_password(const char *password, const char *salt);
+char *generate_rand_salt();
+char *conc_salt_and_pw(const char *pw, const unsigned char *salt);
 
 int64_t register_user(const char *username, const char *password);
 int64_t verify_user(const char *username, const char *password);
