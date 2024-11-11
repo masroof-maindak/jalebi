@@ -87,8 +87,6 @@ int64_t register_user(const char *un, const char *pw) {
 	char *pwSalt, *salt = generate_rand_salt();
 	unsigned char pwHash[SHA256_DIGEST_LENGTH];
 	sqlite3_stmt *stmt;
-	const char *insertSql =
-		"INSERT INTO users (username, password, salt) VALUES (?, ?, ?);";
 
 	if (salt == NULL)
 		return -1;
@@ -100,7 +98,7 @@ int64_t register_user(const char *un, const char *pw) {
 
 	SHA256((const unsigned char *)pwSalt, strlen(pwSalt), pwHash);
 
-	if (sqlite3_prepare_v2(db, insertSql, -1, &stmt, NULL) != SQLITE_OK) {
+	if (sqlite3_prepare_v2(db, INSERT_USER_SQL, -1, &stmt, NULL) != SQLITE_OK) {
 		fprintf(stderr, "sqlite3_prepare_v2() in register_user(): %s\n",
 				sqlite3_errmsg(db));
 		uid = -3;
