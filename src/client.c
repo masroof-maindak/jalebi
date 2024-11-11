@@ -60,7 +60,8 @@ int main() {
 }
 
 char select_mode() {
-	int c, x, ctr;
+	char c, x;
+	unsigned int ctr;
 
 	do {
 		ctr = 0;

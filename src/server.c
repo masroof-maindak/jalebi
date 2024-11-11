@@ -1,12 +1,12 @@
 #include <arpa/inet.h>
 #include <dirent.h>
 #include <pthread.h>
+#include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <semaphore.h>
 #include <unistd.h>
 
 #include "../include/auth.h"
@@ -128,7 +128,7 @@ int main() {
 			perror("accept() in main()");
 			goto cleanup;
 		}
-		
+
 		sem_wait(&empty);
 		pthread_mutex_lock(&EnqMut);
 		enqueue(q, (void *)(&cfd));
