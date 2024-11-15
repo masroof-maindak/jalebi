@@ -28,6 +28,7 @@ sudo apt install libsqlite3-dev libssl-dev libreadline-dev libbsd-dev
 ---
 
 - [ ] Thread monitoring - Restart killed threads, etc.
+    - How to find out a thread's died?
 - [ ] close() -> shutdown() for sockets ???
 - [ ] Signal handlers; gracefully deal w/ sockets/readline(?)/database/threadpool (!!!)
 
