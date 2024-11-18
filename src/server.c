@@ -469,7 +469,7 @@ void init_producer_consumer(struct producer_consumer *pc, int empty) {
 }
 
 void destroy_producer_consumer(struct producer_consumer *pc) {
-	sem_destroy(&clients.queued);
-	sem_destroy(&clients.empty);
-	sem_destroy(&clients.mutex);
+	sem_destroy(&pc->queued);
+	sem_destroy(&pc->empty);
+	sem_destroy(&pc->mutex);
 }

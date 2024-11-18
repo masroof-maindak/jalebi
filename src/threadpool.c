@@ -25,7 +25,7 @@ struct threadpool *create_threadpool(size_t n, void *(*fp)(void *)) {
 	}
 
 	/* CHECK: what to do if failure occurs ? */
-	for (int i = 0; i < n; i++) {
+	for (size_t i = 0; i < n; i++) {
 		if (pthread_create(&tp->threads[i], NULL, fp, NULL) != 0) {
 			perror("pthread_create() in create_tp()");
 			return NULL;
