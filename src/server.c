@@ -49,15 +49,12 @@ void *worker_thread(void *arg __attribute__((unused))) {
 
 void *client_thread(void *arg __attribute__((unused))) {
 	for (;;) {
-		/* FIXME: BLOCKING HERE! */
 		sem_wait(&clients.queued);
 		sem_wait(&clients.mutex);
 		int cfd = *(int *)peek_top(clientQ);
-		printf(YELLOW "popped value off q: %d\n", cfd);
 		dequeue(clientQ);
 		sem_post(&clients.mutex);
 		sem_post(&clients.empty);
-		printf(YELLOW "crossed barrier #2\n");
 
 		char *buf = NULL, udir[PATH_MAX] = "\0";
 		ssize_t n;
@@ -174,11 +171,9 @@ int main() {
 
 		sem_wait(&clients.empty);
 		sem_wait(&clients.mutex);
-		printf(BLUE "Q-ing client %d\n", cfd);
 		enqueue(clientQ, &cfd);
 		sem_post(&clients.mutex);
 		sem_post(&clients.queued);
-		printf(BLUE "crossed barrier #1\n");
 	}
 
 cleanup:
@@ -206,6 +201,8 @@ cleanup:
 }
 
 int init(int *sfd, struct sockaddr_in *saddr) {
+	init_producer_consumer(&clients, MAXCLIENTS);
+
 	if (ensure_dir_exists(HOSTDIR) == false || init_db() != 0)
 		return 1;
 
@@ -221,7 +218,6 @@ int init(int *sfd, struct sockaddr_in *saddr) {
 	if (clientQ == NULL)
 		return 4;
 
-	init_producer_consumer(&clients, MAXCLIENTS);
 	return 0;
 }
 

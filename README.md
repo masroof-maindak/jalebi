@@ -21,14 +21,13 @@ sudo apt install libsqlite3-dev libssl-dev libreadline-dev libbsd-dev
 
 ### Todo
 
-- [ ] Producer-consumer problem?
 - [ ] Threadpool -> incorporate queue
 - [ ] Worker thread function
     - [ ] Worker queue
     - [ ] Global session management
         - [ ] Dynamic mutex array?
     - [ ] Process task (easy)
-    - [ ] Push answer to **answer queue**
+    - [ ] Push answer to answer queue
 
 ---
 
