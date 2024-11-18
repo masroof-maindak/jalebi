@@ -14,20 +14,29 @@
 #include "../include/server.h"
 #include "../include/threadpool.h"
 
-struct tpool *tp	   = NULL;
-struct queue *clientQ  = NULL;
-pthread_mutex_t EnqMut = PTHREAD_MUTEX_INITIALIZER;
-sem_t empty;
-sem_t filled;
+struct tpool *clientTp		= NULL;
+struct tpool *workerTp		= NULL;
+struct queue *clientQ		= NULL;
+struct queue *answerQ		= NULL;
+pthread_mutex_t clientMutex = PTHREAD_MUTEX_INITIALIZER;
+sem_t clientEmptyNum;
+sem_t clientQueuedNum;
+
+void *worker_thread(void *arg __attribute__((unused)));
 
 void *client_thread(void *arg __attribute__((unused))) {
 	for (;;) {
-		sem_wait(&filled);
-		pthread_mutex_lock(&EnqMut);
-		int cfd = *(int *)top(clientQ);
+		/* CHECK: BLOCKING HERE! */
+		sem_wait(&clientQueuedNum);
+		printf(YELLOW "crossed barrier #100\n");
+		pthread_mutex_lock(&clientMutex);
+		int cfd = *(int *)peek_top(clientQ);
+		printf(YELLOW "popped value off q: %d\n", cfd);
 		dequeue(clientQ);
-		pthread_mutex_unlock(&EnqMut);
-		sem_post(&empty);
+		pthread_mutex_unlock(&clientMutex);
+		printf(YELLOW "unlocked mutex #2\n");
+		sem_post(&clientEmptyNum);
+		printf(YELLOW "crossed barrier #200\n");
 
 		char *buf = NULL, udir[PATH_MAX] = "\0";
 		ssize_t n;
@@ -121,6 +130,7 @@ void *client_thread(void *arg __attribute__((unused))) {
 		}
 
 	cleanup:
+		printf(YELLOW "Thread performing cleanup\n");
 		free(buf);
 		if (close(cfd) == -1)
 			perror("close(cfd) in handle_client");
@@ -140,16 +150,20 @@ int main() {
 	printf("Listening on port %d...\n", SERVER_PORT);
 
 	for (;;) {
-		if ((cfd = accept(sfd, (struct sockaddr *)&caddr, &len)) == -1) {
+		if (-1 == (cfd = accept(sfd, (struct sockaddr *)&caddr, &len))) {
 			perror("accept() in main()");
 			goto cleanup;
 		}
 
-		sem_wait(&empty);
-		pthread_mutex_lock(&EnqMut);
-		enqueue(clientQ, (void *)(&cfd));
-		pthread_mutex_unlock(&EnqMut);
-		sem_post(&filled);
+		sem_wait(&clientEmptyNum);
+		printf(BLUE "crossed barrier #1\n");
+		pthread_mutex_lock(&clientMutex);
+		printf(BLUE "Q-ing client %d\n", cfd);
+		enqueue(clientQ, &cfd);
+		pthread_mutex_unlock(&clientMutex);
+		printf(BLUE "unlocked mutex #1\n");
+		sem_post(&clientQueuedNum);
+		printf(BLUE "crossed barrier #2\n");
 	}
 
 cleanup:
@@ -159,7 +173,7 @@ cleanup:
 	case 0:
 		delete_queue(clientQ);
 	case 4:
-		delete_threadpool(tp);
+		delete_threadpool(clientTp);
 	case 3:
 		if ((close(sfd)) == -1)
 			perror("close(sfd)");
@@ -172,9 +186,9 @@ cleanup:
 	}
 #pragma GCC diagnostic pop
 
-	pthread_mutex_destroy(&EnqMut);
-	sem_destroy(&empty);
-	sem_destroy(&filled);
+	pthread_mutex_destroy(&clientMutex);
+	sem_destroy(&clientEmptyNum);
+	sem_destroy(&clientQueuedNum);
 	return status;
 }
 
@@ -182,19 +196,20 @@ int init(int *sfd, struct sockaddr_in *saddr) {
 	if (ensure_dir_exists(HOSTDIR) == false || init_db() != 0)
 		return 1;
 
-	if ((*sfd = init_server_socket(saddr)) < 0)
+	*sfd = init_server_socket(saddr);
+	if (*sfd < 0)
 		return 2;
 
-	tp = create_threadpool(MAXCLIENTS, client_thread);
-	if (tp == NULL)
+	clientTp = create_threadpool(MAXCLIENTS, client_thread);
+	if (clientTp == NULL)
 		return 3;
 
 	clientQ = create_queue(sizeof(int));
 	if (clientQ == NULL)
 		return 4;
 
-	sem_init(&empty, 0, MAXCLIENTS);
-	sem_init(&filled, 0, 0);
+	sem_init(&clientEmptyNum, 0, MAXCLIENTS);
+	sem_init(&clientQueuedNum, 0, 0);
 
 	return 0;
 }

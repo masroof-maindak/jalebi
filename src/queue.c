@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "../include/queue.h"
+#include "../include/utils.h" // TODO: Remove
 
 struct queue *create_queue(size_t elemSize) {
 	struct queue *q = malloc(sizeof(struct queue));
@@ -84,16 +85,20 @@ void enqueue(struct queue *q, const void *data) {
 
 	memcpy(new->data, data, q->elemSize);
 	q->size++;
+	printf(CYAN "QUEUED %d\n", *(int *)data);
 }
 
 /**
  * @brief removes the earliest node added
  */
 void dequeue(struct queue *q) {
-	if (q->size == 0)
+	if (q->size == 0) {
 		return;
+		printf(CYAN "CAN'T DEQUEUE; SIZE EMPTY!\n");
+	}
 
-	struct node *n	= q->header->next;
+	struct node *n = q->header->next;
+	printf(CYAN "DEQUEUING %d\n", *(int *)n->data);
 	q->header->next = n->next;
 	n->next->prev	= q->header;
 
@@ -107,9 +112,20 @@ void dequeue(struct queue *q) {
 }
 
 /**
- * @brief returns a copy of the value at the head of the queue
+ * @brief returns a pointer to the value at the top of the queue
  */
-void *top(struct queue *q) {
+void *peek_top(struct queue *q) {
+	if (q->size == 0) {
+		printf(CYAN "CAN'T PEEK; SIZE EMPTY!\n");
+		return NULL;
+	}
+	return q->header->next->data;
+}
+
+/**
+ * @brief returns a copy of the value at the head of the queue; must be freed.
+ */
+void *copy_top(struct queue *q) {
 	if (q->size == 0)
 		return NULL;
 
