@@ -1,7 +1,6 @@
 #include <arpa/inet.h>
 #include <dirent.h>
 #include <pthread.h>
-#include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,29 +13,26 @@
 #include "../include/server.h"
 #include "../include/threadpool.h"
 
-struct tpool *clientTp		= NULL;
-struct tpool *workerTp		= NULL;
+struct threadpool *clientTp = NULL;
+struct threadpool *workerTp = NULL;
 struct queue *clientQ		= NULL;
+struct queue *workerQ		= NULL;
 struct queue *answerQ		= NULL;
-pthread_mutex_t clientMutex = PTHREAD_MUTEX_INITIALIZER;
-sem_t clientEmptyNum;
-sem_t clientQueuedNum;
+struct producer_consumer clients, answers;
 
 void *worker_thread(void *arg __attribute__((unused)));
 
 void *client_thread(void *arg __attribute__((unused))) {
 	for (;;) {
-		/* CHECK: BLOCKING HERE! */
-		sem_wait(&clientQueuedNum);
-		printf(YELLOW "crossed barrier #100\n");
-		pthread_mutex_lock(&clientMutex);
+		/* FIXME: BLOCKING HERE! */
+		sem_wait(&clients.queued);
+		sem_wait(&clients.mutex);
 		int cfd = *(int *)peek_top(clientQ);
 		printf(YELLOW "popped value off q: %d\n", cfd);
 		dequeue(clientQ);
-		pthread_mutex_unlock(&clientMutex);
-		printf(YELLOW "unlocked mutex #2\n");
-		sem_post(&clientEmptyNum);
-		printf(YELLOW "crossed barrier #200\n");
+		sem_post(&clients.mutex);
+		sem_post(&clients.empty);
+		printf(YELLOW "crossed barrier #2\n");
 
 		char *buf = NULL, udir[PATH_MAX] = "\0";
 		ssize_t n;
@@ -155,15 +151,13 @@ int main() {
 			goto cleanup;
 		}
 
-		sem_wait(&clientEmptyNum);
-		printf(BLUE "crossed barrier #1\n");
-		pthread_mutex_lock(&clientMutex);
+		sem_wait(&clients.empty);
+		sem_wait(&clients.mutex);
 		printf(BLUE "Q-ing client %d\n", cfd);
 		enqueue(clientQ, &cfd);
-		pthread_mutex_unlock(&clientMutex);
-		printf(BLUE "unlocked mutex #1\n");
-		sem_post(&clientQueuedNum);
-		printf(BLUE "crossed barrier #2\n");
+		sem_post(&clients.mutex);
+		sem_post(&clients.queued);
+		printf(BLUE "crossed barrier #1\n");
 	}
 
 cleanup:
@@ -186,9 +180,7 @@ cleanup:
 	}
 #pragma GCC diagnostic pop
 
-	pthread_mutex_destroy(&clientMutex);
-	sem_destroy(&clientEmptyNum);
-	sem_destroy(&clientQueuedNum);
+	destroy_producer_consumer(&clients);
 	return status;
 }
 
@@ -208,9 +200,7 @@ int init(int *sfd, struct sockaddr_in *saddr) {
 	if (clientQ == NULL)
 		return 4;
 
-	sem_init(&clientEmptyNum, 0, MAXCLIENTS);
-	sem_init(&clientQueuedNum, 0, 0);
-
+	init_producer_consumer(&clients, MAXCLIENTS);
 	return 0;
 }
 
@@ -470,4 +460,16 @@ int64_t authenticate_and_get_uid(int cfd, char *buf) {
 	un[unL] = pw[pwL] = '\0';
 	uid = (mode == 'L') ? verify_user(un, pw) : register_user(un, pw);
 	return uid;
+}
+
+void init_producer_consumer(struct producer_consumer *pc, int empty) {
+	sem_init(&pc->queued, 0, 0);
+	sem_init(&pc->empty, 0, empty);
+	sem_init(&pc->mutex, 0, 1);
+}
+
+void destroy_producer_consumer(struct producer_consumer *pc) {
+	sem_destroy(&clients.queued);
+	sem_destroy(&clients.empty);
+	sem_destroy(&clients.mutex);
 }

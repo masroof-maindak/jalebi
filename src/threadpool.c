@@ -6,11 +6,11 @@
 /**
  * @brief create `n` threads, running `fp` function
  */
-struct tpool *create_threadpool(uint16_t n, void *(*fp)(void *)) {
+struct threadpool *create_threadpool(size_t n, void *(*fp)(void *)) {
 	if (n == 0)
 		return NULL;
 
-	struct tpool *tp = malloc(sizeof(struct tpool));
+	struct threadpool *tp = malloc(sizeof(struct threadpool));
 	if (tp == NULL) {
 		perror("malloc() in create_tp() - tp");
 		return NULL;
@@ -40,10 +40,9 @@ struct tpool *create_threadpool(uint16_t n, void *(*fp)(void *)) {
 	return tp;
 }
 
-void delete_threadpool(struct tpool *tp) {
+void delete_threadpool(struct threadpool *tp) {
 	if (tp == NULL)
 		return;
-
 	free(tp->threads);
 	free(tp);
 }
