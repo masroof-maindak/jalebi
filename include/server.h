@@ -12,6 +12,18 @@ struct prodcons {
 	sem_t mutex;  /* binary semaphore */
 };
 
+struct task {
+	int cfd;
+	char *buf;
+	char *uuid;
+	char *udir;
+};
+
+struct answer {
+	char *uuid;
+	int status;
+};
+
 #define MAXCLIENTS		 8
 #define MAX_CLIENT_SPACE 10 * 1024 * 1024
 
