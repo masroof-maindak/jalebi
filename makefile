@@ -1,5 +1,9 @@
 include config.mk
 
+# Make a debug build of the server
+default: CFLAGS += $(DEBUG_FLAGS)
+default: jalebi
+
 all: CFLAGS += $(RELEASE_FLAGS)
 all: $(TARGETS)
 
@@ -7,10 +11,10 @@ debug: CFLAGS += $(DEBUG_FLAGS)
 debug: clean $(TARGETS)
 
 jalebi: $(SERVER_OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $^ $(SERVER_LDFLAGS)
 
 namak-paare: $(CLIENT_OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $^ $(CLIENT_LDFLAGS)
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.c
 	@mkdir -p $(BUILDDIR)

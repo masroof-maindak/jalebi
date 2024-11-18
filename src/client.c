@@ -17,7 +17,7 @@ int main() {
 	int sfd, status = 0;
 	enum REQ_TYPE reqType;
 	struct sockaddr_in saddr;
-	char *userInput = NULL;
+	char *line = NULL;
 
 	if ((sfd = init_client_socket(&saddr)) < 0)
 		return 1;
@@ -29,9 +29,9 @@ int main() {
 		fprintf(stderr, RED "Error: couldn't authenticate user!\n" RESET);
 
 	while (status == 0) {
-		userInput = readline("namak-paare > ");
+		line = readline("namak-paare > ");
 
-		if ((reqType = handle_input(userInput)) < 0)
+		if ((reqType = handle_input(line)) < 0)
 			continue;
 
 		switch (reqType) {
@@ -39,10 +39,10 @@ int main() {
 			status = client_wrap_view(sfd);
 			break;
 		case DOWNLOAD:
-			status = client_wrap_download(sfd, userInput);
+			status = client_wrap_download(sfd, line);
 			break;
 		case UPLOAD:
-			status = client_wrap_upload(sfd, userInput);
+			status = client_wrap_upload(sfd, line);
 			break;
 		case 4:
 			status = -1;
@@ -51,8 +51,8 @@ int main() {
 			break;
 		}
 
-		free(userInput);
-		userInput = NULL;
+		free(line);
+		line = NULL;
 	}
 
 	close(sfd);
@@ -60,7 +60,8 @@ int main() {
 }
 
 char select_mode() {
-	int c, x, ctr;
+	char c, x;
+	unsigned int ctr;
 
 	do {
 		ctr = 0;
@@ -108,11 +109,11 @@ char *get_username(char *un, uint8_t *unLen) {
 }
 
 int send_auth_info(int sfd, char mode, const char *pw, const char *un,
-				   uint8_t unL, uint8_t pwL) {
+				   uint8_t unLen, uint8_t pwLen) {
 	char buf[64];
 	int n;
 
-	n = snprintf(buf, sizeof(buf), "%c%c%c%s%s", mode, unL, pwL, un, pw);
+	n = snprintf(buf, sizeof(buf), "%c%c%c%s%s", mode, unLen, pwLen, un, pw);
 	if (n < 0)
 		return -1;
 
@@ -280,7 +281,7 @@ int client_wrap_view(int sfd) {
 		return -2;
 	}
 
-	if (!idx) {
+	if (idx == 0) {
 		fprintf(stderr, RED "No files on server\n" RESET);
 		return 0;
 	}

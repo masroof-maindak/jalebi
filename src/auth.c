@@ -12,7 +12,8 @@ static sqlite3 *db;
 int init_db() {
 	int rc;
 	if ((rc = sqlite3_open(DATABASE_PATH, &db))) {
-		fprintf(stderr, "sqlite3_error() in init_db(): %s\n", sqlite3_errmsg(db));
+		fprintf(stderr, "sqlite3_error() in init_db(): %s\n",
+				sqlite3_errmsg(db));
 		return -1;
 	}
 
@@ -31,7 +32,8 @@ int init_db() {
 int close_db() {
 	int rc;
 	if ((rc = sqlite3_close(db)) != SQLITE_OK) {
-		fprintf(stderr, "sqlite3_close() in close_db(): %s\n", sqlite3_errmsg(db));
+		fprintf(stderr, "sqlite3_close() in close_db(): %s\n",
+				sqlite3_errmsg(db));
 		return -1;
 	}
 	return 0;
@@ -40,7 +42,7 @@ int close_db() {
 /**
  * @brief Generates a random salt
  */
-char *get_salt() {
+char *generate_rand_salt() {
 	char *salt;
 	if ((salt = malloc(SALT_LENGTH + 1)) == NULL) {
 		perror("malloc() in get_salt()");
@@ -59,7 +61,7 @@ char *get_salt() {
 /**
  * @brief Concatenates the password and salt
  */
-char *get_salted_pw(const char *pw, const unsigned char *salt) {
+char *conc_salt_and_pw(const char *pw, const unsigned char *salt) {
 	size_t len = strlen(pw) + SALT_LENGTH + 1;
 	char *saltedPw;
 
@@ -82,24 +84,23 @@ char *get_salted_pw(const char *pw, const unsigned char *salt) {
  */
 int64_t register_user(const char *un, const char *pw) {
 	int64_t uid = -1;
-	char *pwSalt, *salt = get_salt();
+	char *pwSalt, *salt = generate_rand_salt();
 	unsigned char pwHash[SHA256_DIGEST_LENGTH];
 	sqlite3_stmt *stmt;
-	const char *insertSql =
-		"INSERT INTO users (username, password, salt) VALUES (?, ?, ?);";
 
 	if (salt == NULL)
 		return -1;
 
-	if ((pwSalt = get_salted_pw(pw, (const unsigned char *)salt)) == NULL) {
+	if ((pwSalt = conc_salt_and_pw(pw, (const unsigned char *)salt)) == NULL) {
 		free(salt);
 		return -2;
 	}
 
 	SHA256((const unsigned char *)pwSalt, strlen(pwSalt), pwHash);
 
-	if (sqlite3_prepare_v2(db, insertSql, -1, &stmt, NULL) != SQLITE_OK) {
-		fprintf(stderr, "sqlite3_prepare_v2() in register_user(): %s\n", sqlite3_errmsg(db));
+	if (sqlite3_prepare_v2(db, INSERT_USER_SQL, -1, &stmt, NULL) != SQLITE_OK) {
+		fprintf(stderr, "sqlite3_prepare_v2() in register_user(): %s\n",
+				sqlite3_errmsg(db));
 		uid = -3;
 		goto cleanup;
 	}
@@ -109,7 +110,8 @@ int64_t register_user(const char *un, const char *pw) {
 	sqlite3_bind_text(stmt, 3, salt, -1, SQLITE_STATIC);
 
 	if (sqlite3_step(stmt) != SQLITE_DONE) {
-		fprintf(stderr, "sqlite3_step() in register_user(): %s\n", sqlite3_errmsg(db));
+		fprintf(stderr, "sqlite3_step() in register_user(): %s\n",
+				sqlite3_errmsg(db));
 		uid = -4;
 		goto cleanup;
 	}
@@ -146,7 +148,7 @@ int64_t verify_user(const char *username, const char *pw) {
 	const unsigned char *dbPwHash = sqlite3_column_blob(stmt, 0);
 	const unsigned char *dbSalt	  = sqlite3_column_text(stmt, 1);
 	const int64_t uid			  = sqlite3_column_int(stmt, 2);
-	char *pwSalt				  = get_salted_pw(pw, dbSalt);
+	char *pwSalt				  = conc_salt_and_pw(pw, dbSalt);
 
 	if (pwSalt == NULL) {
 		sqlite3_finalize(stmt);

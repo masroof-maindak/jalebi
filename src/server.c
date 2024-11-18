@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <dirent.h>
 #include <pthread.h>
+#include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,18 +14,29 @@
 #include "../include/server.h"
 #include "../include/threadpool.h"
 
-struct tpool *tp	   = NULL;
-struct queue *q		   = NULL;
-pthread_mutex_t EnqMut = PTHREAD_MUTEX_INITIALIZER;
+struct tpool *clientTp		= NULL;
+struct tpool *workerTp		= NULL;
+struct queue *clientQ		= NULL;
+struct queue *answerQ		= NULL;
+pthread_mutex_t clientMutex = PTHREAD_MUTEX_INITIALIZER;
+sem_t clientEmptyNum;
+sem_t clientQueuedNum;
 
-void *handle_client(void *arg __attribute__((unused))) {
+void *worker_thread(void *arg __attribute__((unused)));
 
+void *client_thread(void *arg __attribute__((unused))) {
 	for (;;) {
-		/* TODO: synchronisation; only pick up task if available */
-		// ---
-		int cfd = *(int *)top(q);
-		dequeue(q);
-		// ---
+		/* CHECK: BLOCKING HERE! */
+		sem_wait(&clientQueuedNum);
+		printf(YELLOW "crossed barrier #100\n");
+		pthread_mutex_lock(&clientMutex);
+		int cfd = *(int *)peek_top(clientQ);
+		printf(YELLOW "popped value off q: %d\n", cfd);
+		dequeue(clientQ);
+		pthread_mutex_unlock(&clientMutex);
+		printf(YELLOW "unlocked mutex #2\n");
+		sem_post(&clientEmptyNum);
+		printf(YELLOW "crossed barrier #200\n");
 
 		char *buf = NULL, udir[PATH_MAX] = "\0";
 		ssize_t n;
@@ -67,6 +79,22 @@ void *handle_client(void *arg __attribute__((unused))) {
 
 			enum REQ_TYPE rt = identify_req_type(buf);
 
+			/*
+			 * TODO: Modify the client thread to push the task (and other
+			 * relevant information) to a worker queue, alongside a randomly
+			 * generated UUID.
+			 *
+			 * From there, worker threads will pop it, work on it (and
+			 * handling concurrency will be their problem), and push the
+			 * response alongside the UUID to an answer queue.
+			 *
+			 * Meanwhile, the client (communication threads) will be eyeing the
+			 * top of the answer queue. When an answer appears that contains the
+			 * UUID they generated, they'll pop this element, and send the
+			 * response to the original client unconditionally.
+			 */
+
+			// --- {{{ NOTE: This will move to the worker thread.
 			/* TODO: Set global session info */
 			if (rt != INVALID) {
 				;
@@ -77,7 +105,7 @@ void *handle_client(void *arg __attribute__((unused))) {
 				status = server_wrap_view(cfd, udir);
 				break;
 			case UPLOAD:
-				/*  TODO: If this user has another UPLOAD, block thread */
+				/*  TODO: If this user has anything else going on, block */
 				status = server_wrap_download(cfd, buf, udir);
 				break;
 			case DOWNLOAD:
@@ -95,12 +123,14 @@ void *handle_client(void *arg __attribute__((unused))) {
 			if (rt != INVALID) {
 				;
 			}
+			// --- NOTE - fin }}}
 
 			if (status != 0)
 				fprintf(stderr, "Error ocurred in threaded operation\n");
 		}
 
 	cleanup:
+		printf(YELLOW "Thread performing cleanup\n");
 		free(buf);
 		if (close(cfd) == -1)
 			perror("close(cfd) in handle_client");
@@ -110,38 +140,43 @@ void *handle_client(void *arg __attribute__((unused))) {
 }
 
 int main() {
-	int sfd, cfd, ret;
+	int sfd, cfd, status;
 	struct sockaddr_in saddr, caddr;
 	socklen_t len = sizeof(caddr);
 
-	if ((ret = init(&sfd, &saddr)) != 0)
+	if ((status = init(&sfd, &saddr)) != 0)
 		goto cleanup;
 
 	printf("Listening on port %d...\n", SERVER_PORT);
 
 	for (;;) {
-		if ((cfd = accept(sfd, (struct sockaddr *)&caddr, &len)) == -1) {
+		if (-1 == (cfd = accept(sfd, (struct sockaddr *)&caddr, &len))) {
 			perror("accept() in main()");
 			goto cleanup;
 		}
 
-		pthread_mutex_lock(&EnqMut);
-		enqueue(q, (void *)(&cfd));
-		pthread_mutex_unlock(&EnqMut);
+		sem_wait(&clientEmptyNum);
+		printf(BLUE "crossed barrier #1\n");
+		pthread_mutex_lock(&clientMutex);
+		printf(BLUE "Q-ing client %d\n", cfd);
+		enqueue(clientQ, &cfd);
+		pthread_mutex_unlock(&clientMutex);
+		printf(BLUE "unlocked mutex #1\n");
+		sem_post(&clientQueuedNum);
+		printf(BLUE "crossed barrier #2\n");
 	}
 
 cleanup:
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
-	switch (ret) {
+	switch (status) {
 	case 0:
-		delete_queue(q);
+		delete_queue(clientQ);
 	case 4:
-		delete_threadpool(tp);
+		delete_threadpool(clientTp);
 	case 3:
-		if ((close(sfd)) == -1) {
+		if ((close(sfd)) == -1)
 			perror("close(sfd)");
-		}
 	case 2:
 		/* is this right... ? */
 		while (close_db() != 0)
@@ -151,24 +186,30 @@ cleanup:
 	}
 #pragma GCC diagnostic pop
 
-	pthread_mutex_destroy(&EnqMut);
-	return ret;
+	pthread_mutex_destroy(&clientMutex);
+	sem_destroy(&clientEmptyNum);
+	sem_destroy(&clientQueuedNum);
+	return status;
 }
 
 int init(int *sfd, struct sockaddr_in *saddr) {
 	if (ensure_dir_exists(HOSTDIR) == false || init_db() != 0)
 		return 1;
 
-	if ((*sfd = init_server_socket(saddr)) < 0)
+	*sfd = init_server_socket(saddr);
+	if (*sfd < 0)
 		return 2;
 
-	tp = create_threadpool(MAXCLIENTS, handle_client);
-	if (tp == NULL)
+	clientTp = create_threadpool(MAXCLIENTS, client_thread);
+	if (clientTp == NULL)
 		return 3;
 
-	q = create_queue(sizeof(int));
-	if (q == NULL)
+	clientQ = create_queue(sizeof(int));
+	if (clientQ == NULL)
 		return 4;
+
+	sem_init(&clientEmptyNum, 0, MAXCLIENTS);
+	sem_init(&clientQueuedNum, 0, 0);
 
 	return 0;
 }
@@ -322,15 +363,15 @@ int server_wrap_download(int cfd, const char *buf, const char *udir) {
 int server_wrap_view(int cfd, const char *udir) {
 	int status = 0;
 	ssize_t idx;
-	char *ret;
+	char *buf;
 
-	if ((ret = malloc(BUFSIZE)) == NULL) {
+	if ((buf = malloc(BUFSIZE)) == NULL) {
 		perror("malloc() in server_wrap_view()");
 		return -1;
 	}
 
 	/* get list of entries + size and send latter */
-	if ((idx = view(ret, BUFSIZE, udir)) < 0) {
+	if ((idx = view(buf, BUFSIZE, udir)) < 0) {
 		status = -2;
 		goto cleanup;
 	}
@@ -347,7 +388,7 @@ int server_wrap_view(int cfd, const char *udir) {
 
 	/* transfer information */
 	for (int i = 0; idx > 0; i++, idx -= BUFSIZE) {
-		if ((send(cfd, ret + (i << 10), min(BUFSIZE, idx), 0)) == -1) {
+		if ((send(cfd, buf + (i << 10), min(BUFSIZE, idx), 0)) == -1) {
 			perror("send() #2 in server_wrap_view()");
 			status = -4;
 			goto cleanup;
@@ -355,7 +396,7 @@ int server_wrap_view(int cfd, const char *udir) {
 	}
 
 cleanup:
-	free(ret);
+	free(buf);
 	return status;
 }
 

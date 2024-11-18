@@ -129,8 +129,8 @@ int download_file(const char *fname, size_t bytes, int sfd) {
 
 	if ((buf = malloc(BUFSIZE)) == NULL) {
 		perror("malloc() in download()");
-		ret = 2;
-		goto cleanup;
+		fclose(fp);
+		return 2;
 	}
 
 	while (bytes > 0) {
