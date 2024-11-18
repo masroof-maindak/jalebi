@@ -20,7 +20,32 @@ struct queue *workerQ		= NULL;
 struct queue *answerQ		= NULL;
 struct prodcons clients, answers;
 
-void *worker_thread(void *arg __attribute__((unused)));
+void *worker_thread(void *arg __attribute__((unused))) {
+	/*
+	 * TODO: Pop task off workerQ
+	 * NOTE: Possibly abstract this off to threadpool?
+	 */
+
+	/* int status = 0; */
+
+	/*
+	 * TODO: Block this task if a write task is currently being processed or the
+	 * new task is a write task (irrespective of whatever is being processed)
+	 * TODO(?): Extrapolate this to file-level granularity
+	 *
+	 * NOTE: Global mutex dynamic array?
+	 */
+
+	/*
+	 * TODO: Process task; shrimply copy over the switch-case for reqType
+	 */
+
+	/*
+	 * TODO: Push status + UUID to answerQ
+	 */
+
+	return NULL;
+}
 
 void *client_thread(void *arg __attribute__((unused))) {
 	for (;;) {
@@ -76,18 +101,8 @@ void *client_thread(void *arg __attribute__((unused))) {
 			enum REQ_TYPE rt = identify_req_type(buf);
 
 			/*
-			 * TODO: Modify the client thread to push the task (and other
-			 * relevant information) to a worker queue, alongside a randomly
-			 * generated UUID.
-			 *
-			 * From there, worker threads will pop it, work on it (and
-			 * handling concurrency will be their problem), and push the
-			 * response alongside the UUID to an answer queue.
-			 *
-			 * Meanwhile, the client (communication threads) will be eyeing the
-			 * top of the answer queue. When an answer appears that contains the
-			 * UUID they generated, they'll pop this element, and send the
-			 * response to the original client unconditionally.
+			 * TODO: Push the {struct task} to a worker queue, alongside a
+			 * randomly generated UUID.
 			 */
 
 			// --- {{{ NOTE: This will move to the worker thread.
@@ -120,6 +135,12 @@ void *client_thread(void *arg __attribute__((unused))) {
 				;
 			}
 			// --- NOTE - fin }}}
+
+			/*
+			 * TODO: Watch the top of the answer queue. When an answer appears
+			 * that contains the UUID this client generated, pop this {struct
+			 * answer}
+			 */
 
 			if (status != 0)
 				fprintf(stderr, "Error ocurred in threaded operation\n");
