@@ -2,15 +2,13 @@
 #define THREADPOOL_H
 
 #include <pthread.h>
-#include <stdint.h>
 
-/* TODO: power of 2 */
-struct tpool {
-	uint16_t size;
+struct threadpool {
+	size_t size;
 	pthread_t *threads;
 };
 
-struct tpool *create_threadpool(uint16_t n, void *(*fp)(void *));
-void delete_threadpool(struct tpool *tp);
+struct threadpool *create_threadpool(size_t n, void *(*fp)(void *));
+void delete_threadpool(struct threadpool *tp);
 
 #endif // THREADPOOL_H_H
