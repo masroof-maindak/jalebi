@@ -59,7 +59,7 @@ void delete_queue(struct queue *q) {
 }
 
 /**
- * @brief adds a ndoe at the end of the queue
+ * @brief adds a node at the end of the queue
  * @param data must point to a chunk of memory that is the same size as the
  * argument used to create a queue object
  */

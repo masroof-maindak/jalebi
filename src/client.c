@@ -109,11 +109,11 @@ char *get_username(char *un, uint8_t *unLen) {
 }
 
 int send_auth_info(int sfd, char mode, const char *pw, const char *un,
-				   uint8_t unL, uint8_t pwL) {
+				   uint8_t unLen, uint8_t pwLen) {
 	char buf[64];
 	int n;
 
-	n = snprintf(buf, sizeof(buf), "%c%c%c%s%s", mode, unL, pwL, un, pw);
+	n = snprintf(buf, sizeof(buf), "%c%c%c%s%s", mode, unLen, pwLen, un, pw);
 	if (n < 0)
 		return -1;
 

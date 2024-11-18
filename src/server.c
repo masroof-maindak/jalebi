@@ -15,18 +15,17 @@
 #include "../include/threadpool.h"
 
 struct tpool *tp	   = NULL;
-struct queue *q		   = NULL;
+struct queue *clientQ  = NULL;
 pthread_mutex_t EnqMut = PTHREAD_MUTEX_INITIALIZER;
 sem_t empty;
 sem_t filled;
 
-void *handle_client(void *arg __attribute__((unused))) {
-
+void *client_thread(void *arg __attribute__((unused))) {
 	for (;;) {
 		sem_wait(&filled);
 		pthread_mutex_lock(&EnqMut);
-		int cfd = *(int *)top(q);
-		dequeue(q);
+		int cfd = *(int *)top(clientQ);
+		dequeue(clientQ);
 		pthread_mutex_unlock(&EnqMut);
 		sem_post(&empty);
 
@@ -71,6 +70,22 @@ void *handle_client(void *arg __attribute__((unused))) {
 
 			enum REQ_TYPE rt = identify_req_type(buf);
 
+			/*
+			 * TODO: Modify the client thread to push the task (and other
+			 * relevant information) to a worker queue, alongside a randomly
+			 * generated UUID.
+			 *
+			 * From there, worker threads will pop it, work on it (and
+			 * handling concurrency will be their problem), and push the
+			 * response alongside the UUID to an answer queue.
+			 *
+			 * Meanwhile, the client (communication threads) will be eyeing the
+			 * top of the answer queue. When an answer appears that contains the
+			 * UUID they generated, they'll pop this element, and send the
+			 * response to the original client unconditionally.
+			 */
+
+			// --- {{{ NOTE: This will move to the worker thread.
 			/* TODO: Set global session info */
 			if (rt != INVALID) {
 				;
@@ -81,7 +96,7 @@ void *handle_client(void *arg __attribute__((unused))) {
 				status = server_wrap_view(cfd, udir);
 				break;
 			case UPLOAD:
-				/*  TODO: If this user has another UPLOAD, block thread */
+				/*  TODO: If this user has anything else going on, block */
 				status = server_wrap_download(cfd, buf, udir);
 				break;
 			case DOWNLOAD:
@@ -99,6 +114,7 @@ void *handle_client(void *arg __attribute__((unused))) {
 			if (rt != INVALID) {
 				;
 			}
+			// --- NOTE - fin }}}
 
 			if (status != 0)
 				fprintf(stderr, "Error ocurred in threaded operation\n");
@@ -114,11 +130,11 @@ void *handle_client(void *arg __attribute__((unused))) {
 }
 
 int main() {
-	int sfd, cfd, ret;
+	int sfd, cfd, status;
 	struct sockaddr_in saddr, caddr;
 	socklen_t len = sizeof(caddr);
 
-	if ((ret = init(&sfd, &saddr)) != 0)
+	if ((status = init(&sfd, &saddr)) != 0)
 		goto cleanup;
 
 	printf("Listening on port %d...\n", SERVER_PORT);
@@ -131,7 +147,7 @@ int main() {
 
 		sem_wait(&empty);
 		pthread_mutex_lock(&EnqMut);
-		enqueue(q, (void *)(&cfd));
+		enqueue(clientQ, (void *)(&cfd));
 		pthread_mutex_unlock(&EnqMut);
 		sem_post(&filled);
 	}
@@ -139,15 +155,14 @@ int main() {
 cleanup:
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
-	switch (ret) {
+	switch (status) {
 	case 0:
-		delete_queue(q);
+		delete_queue(clientQ);
 	case 4:
 		delete_threadpool(tp);
 	case 3:
-		if ((close(sfd)) == -1) {
+		if ((close(sfd)) == -1)
 			perror("close(sfd)");
-		}
 	case 2:
 		/* is this right... ? */
 		while (close_db() != 0)
@@ -160,7 +175,7 @@ cleanup:
 	pthread_mutex_destroy(&EnqMut);
 	sem_destroy(&empty);
 	sem_destroy(&filled);
-	return ret;
+	return status;
 }
 
 int init(int *sfd, struct sockaddr_in *saddr) {
@@ -170,12 +185,12 @@ int init(int *sfd, struct sockaddr_in *saddr) {
 	if ((*sfd = init_server_socket(saddr)) < 0)
 		return 2;
 
-	tp = create_threadpool(MAXCLIENTS, handle_client);
+	tp = create_threadpool(MAXCLIENTS, client_thread);
 	if (tp == NULL)
 		return 3;
 
-	q = create_queue(sizeof(int));
-	if (q == NULL)
+	clientQ = create_queue(sizeof(int));
+	if (clientQ == NULL)
 		return 4;
 
 	sem_init(&empty, 0, MAXCLIENTS);
@@ -333,15 +348,15 @@ int server_wrap_download(int cfd, const char *buf, const char *udir) {
 int server_wrap_view(int cfd, const char *udir) {
 	int status = 0;
 	ssize_t idx;
-	char *ret;
+	char *buf;
 
-	if ((ret = malloc(BUFSIZE)) == NULL) {
+	if ((buf = malloc(BUFSIZE)) == NULL) {
 		perror("malloc() in server_wrap_view()");
 		return -1;
 	}
 
 	/* get list of entries + size and send latter */
-	if ((idx = view(ret, BUFSIZE, udir)) < 0) {
+	if ((idx = view(buf, BUFSIZE, udir)) < 0) {
 		status = -2;
 		goto cleanup;
 	}
@@ -358,7 +373,7 @@ int server_wrap_view(int cfd, const char *udir) {
 
 	/* transfer information */
 	for (int i = 0; idx > 0; i++, idx -= BUFSIZE) {
-		if ((send(cfd, ret + (i << 10), min(BUFSIZE, idx), 0)) == -1) {
+		if ((send(cfd, buf + (i << 10), min(BUFSIZE, idx), 0)) == -1) {
 			perror("send() #2 in server_wrap_view()");
 			status = -4;
 			goto cleanup;
@@ -366,7 +381,7 @@ int server_wrap_view(int cfd, const char *udir) {
 	}
 
 cleanup:
-	free(ret);
+	free(buf);
 	return status;
 }
 
