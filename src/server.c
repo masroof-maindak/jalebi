@@ -18,7 +18,7 @@ struct threadpool *workerTp = NULL;
 struct queue *clientQ		= NULL;
 struct queue *workerQ		= NULL;
 struct queue *answerQ		= NULL;
-struct producer_consumer clients, answers;
+struct prodcons clients, answers;
 
 void *worker_thread(void *arg __attribute__((unused)));
 
@@ -462,13 +462,13 @@ int64_t authenticate_and_get_uid(int cfd, char *buf) {
 	return uid;
 }
 
-void init_producer_consumer(struct producer_consumer *pc, int empty) {
+void init_producer_consumer(struct prodcons *pc, int empty) {
 	sem_init(&pc->queued, 0, 0);
 	sem_init(&pc->empty, 0, empty);
 	sem_init(&pc->mutex, 0, 1);
 }
 
-void destroy_producer_consumer(struct producer_consumer *pc) {
+void destroy_producer_consumer(struct prodcons *pc) {
 	sem_destroy(&pc->queued);
 	sem_destroy(&pc->empty);
 	sem_destroy(&pc->mutex);
