@@ -154,11 +154,12 @@ int download_file(const char *fname, size_t bytes, int sfd) {
 			goto cleanup;
 		}
 
-		fwrite(buf, bytesRead, 1, fp);
-		if (ferror(fp)) {
-			perror("fwrite() in download()");
-			ret = 5;
-			goto cleanup;
+		if (fwrite(buf, 1, bytesRead, fp) < bytesRead) {
+			if (ferror(fp)) {
+				perror("fwrite() in download()");
+				ret = 5;
+				goto cleanup;
+			}
 		}
 
 		bytes -= toRead;
@@ -196,16 +197,16 @@ int upload_file(const char *fname, size_t bytes, int sfd) {
 		toWrite = min(BUFSIZE, bytes);
 
 		bytesRead = fread(buf, 1, toWrite, fp);
-		if (ferror(fp)) {
-			perror("fread() in upload()");
-			ret = 3;
-			goto cleanup;
-		}
-
 		if (bytesRead != toWrite) {
-			fprintf(stderr, "Error: file read mismatch!");
-			ret = 4;
-			goto cleanup;
+			if (feof(fp)) {
+				fprintf(stderr, "fread() in upload_file - EOF occurred");
+				ret = 3;
+				goto cleanup;
+			} else if (ferror(fp)) {
+				perror("fread() in upload_file()");
+				ret = 4;
+				goto cleanup;
+			}
 		}
 
 		if (send(sfd, buf, bytesRead, 0) == -1) {
