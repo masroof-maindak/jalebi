@@ -38,7 +38,7 @@ uint8_t get_num_digits(__off_t n) {
  * `size` and currently has `idx` bytes written), would overflow it, then double
  * `buf`. `size` is updated in this case.
  *
- * @return
+ * @return NULL on failure, buffer on success
  */
 char *double_if_Of(char *buf, size_t idx, size_t add, size_t *size) {
 	char *tmp = NULL;
