@@ -3,6 +3,8 @@
 
 #include <semaphore.h>
 
+#include <uuid/uuid.h>
+
 #include "bool.h"
 #include "utils.h"
 
@@ -12,16 +14,16 @@ struct prodcons {
 	sem_t mutex;  /* binary semaphore */
 };
 
-struct task {
+struct work_task {
 	int cfd;
 	char *buf;
-	char *uuid;
 	char *udir;
+	uuid_t uuid;
 };
 
 struct answer {
-	char *uuid;
 	int status;
+	uuid_t uuid;
 };
 
 #define MAXCLIENTS		 8

@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <uuid/uuid.h>
 
 #include "../include/auth.h"
 #include "../include/queue.h"
@@ -15,139 +16,147 @@
 
 struct threadpool *clientTp = NULL;
 struct threadpool *workerTp = NULL;
-struct queue *clientQ		= NULL;
-struct queue *workerQ		= NULL;
-struct queue *answerQ		= NULL;
+
+struct queue *answerQ = NULL;
+
 struct prodcons clients, answers;
 
-void *worker_thread(void *arg __attribute__((unused))) {
-	/*
-	 * TODO: Pop task off workerQ
-	 * NOTE: Possibly abstract this off to threadpool?
-	 */
+/* TODO: remove after complete */
+void add_task(struct threadpool *tp, void *task);
 
-	/* int status = 0; */
+/**
+ * @brief pops an answer if it hasn't been picked up in 2 seconds
+ */
+void *answer_thread_manager(void *arg __attribute__((unused))) { return NULL; }
 
-	/*
-	 * TODO: Block this task if a write task is currently being processed or the
-	 * new task is a write task (irrespective of whatever is being processed)
-	 * TODO(?): Extrapolate this to file-level granularity
-	 *
-	 * NOTE: Global mutex dynamic array?
-	 */
+/**
+ * @param arg a struct work_task holding details regarding a client's request
+ */
+void *worker_thread(void *arg) {
+	struct work_task *wt = arg;
+	struct answer *ans	 = NULL;
 
-	/*
-	 * TODO: Process task; shrimply copy over the switch-case for reqType
-	 */
+	ans = malloc(sizeof(*ans));
+	if (ans == NULL) {
+		perror("malloc() in worker_thread()");
+	}
 
-	/*
-	 * TODO: Push status + UUID to answerQ
-	 */
+	ans->status = -1;
+	uuid_copy(ans->uuid, wt->uuid);
+
+	enum REQ_TYPE rt = identify_req_type(wt->buf);
+
+	/* TODO: Set global session info */
+	if (rt != INVALID) {
+		;
+	}
+
+	switch (rt) {
+	case VIEW:
+		ans->status = server_wrap_view(wt->cfd, wt->udir);
+		break;
+	case UPLOAD:
+		/*
+		 * TODO: Block this task if a write task is currently being processed or
+		 * the new task is a write task (irrespective of whatever is being
+		 * processed)
+		 * TODO(?): Extrapolate this to file-level granularity
+		 * NOTE : Global mutex dynamic array ?
+		 */
+		ans->status = server_wrap_download(wt->cfd, wt->buf, wt->udir);
+		break;
+	case DOWNLOAD:
+		ans->status = server_wrap_upload(wt->cfd, wt->buf, wt->udir);
+		break;
+	case INVALID:
+		if ((send(wt->cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1)
+			perror("send() in worker_thread()");
+		break;
+	}
+
+	/* TODO: Unset global session info */
+	if (rt != INVALID) {
+		;
+	}
+
+	/* TODO: mutual exclusion around q */
+	enqueue(answerQ, ans);
+	free(ans);
 
 	return NULL;
 }
 
-void *client_thread(void *arg __attribute__((unused))) {
-	for (;;) {
-		sem_wait(&clients.queued);
-		sem_wait(&clients.mutex);
-		int cfd = *(int *)peek_top(clientQ);
-		dequeue(clientQ);
-		sem_post(&clients.mutex);
-		sem_post(&clients.empty);
+/**
+ * @brief this thread will handle authentication and receiving a client's tasks
+ */
+void *client_thread(void *arg) {
+	int cfd				 = *(int *)arg;
+	int status			 = 0;
+	int64_t uid			 = -1;
+	char *buf			 = NULL;
+	struct work_task *wt = NULL;
+	char udir[PATH_MAX]	 = "\0";
 
-		char *buf = NULL, udir[PATH_MAX] = "\0";
-		ssize_t n;
-		int status = 0;
-		int64_t uid;
+	buf = malloc(BUFSIZE);
+	if (buf == NULL) {
+		perror("malloc() #1 in client_thread() - buf");
+		goto cleanup;
+	}
 
-		if ((buf = malloc(BUFSIZE)) == NULL) {
-			perror("malloc() in handle_client()");
-			continue;
-		}
+	wt = malloc(sizeof(*wt));
+	if (wt == NULL) {
+		perror("malloc() #2 in client_thread - wt");
+		goto cleanup;
+	}
 
-		/* get uid, mkdir if needed, and send success/failure */
-		if ((uid = authenticate_and_get_uid(cfd, buf)) < 0 ||
-			(snprintf(udir, sizeof(udir), "%s/%ld", HOSTDIR, uid)) < 0 ||
-			ensure_dir_exists(udir) == false) {
-			if (send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0) == -1)
-				perror("send() #1 in handle_client()");
+	/* get uid, mkdir if needed, and send success/failure */
+	if ((uid = authenticate_and_get_uid(cfd, buf)) < 0 ||
+		(snprintf(udir, sizeof(udir), "%s/%ld", HOSTDIR, uid)) < 0 ||
+		!ensure_dir_exists(udir)) {
+		if (send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0) == -1)
+			perror("send() #1 in client_thread()");
+		goto cleanup;
+	} else {
+		if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
+			perror("send() #2 in client_thread()");
 			goto cleanup;
-		} else {
-			if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
-				perror("send() #2 in handle_client()");
-				goto cleanup;
-			}
+		}
+	}
+
+	while (status == 0) {
+		ssize_t n = recv(cfd, buf, BUFSIZE, 0);
+		if (n == -1) {
+			perror("recv() in client_thread()");
+			goto cleanup;
+		} else if (n == 0) {
+			printf("client_thread(): client has closed socket\n");
+			goto cleanup;
 		}
 
-		while (status == 0) {
+		/* push the {struct task} to a worker queue, alongside a randomly
+		 * generated UUID. */
+		wt->buf	 = buf;
+		wt->cfd	 = cfd;
+		wt->udir = udir;
+		uuid_generate_random(wt->uuid);
+		add_task(workerTp, wt);
 
-			n = recv(cfd, buf, BUFSIZE, 0);
-			switch (n) {
-			case -1:
-				perror("recv() in handle_client()");
-				goto cleanup;
-			case 0:
-				printf("Client has closed the socket!\n");
-				close(cfd);
-				goto cleanup;
-			default:
-				break;
-			}
+		/*
+		 * TODO: Watch the top of the answer queue. When an answer appears
+		 * that contains the UUID this client generated, pop this {struct
+		 * answer}
+		 */
+		memset(wt, 0, sizeof(*wt));
 
-			enum REQ_TYPE rt = identify_req_type(buf);
-
-			/*
-			 * TODO: Push the {struct task} to a worker queue, alongside a
-			 * randomly generated UUID.
-			 */
-
-			// --- {{{ NOTE: This will move to the worker thread.
-			/* TODO: Set global session info */
-			if (rt != INVALID) {
-				;
-			}
-
-			switch (rt) {
-			case VIEW:
-				status = server_wrap_view(cfd, udir);
-				break;
-			case UPLOAD:
-				/*  TODO: If this user has anything else going on, block */
-				status = server_wrap_download(cfd, buf, udir);
-				break;
-			case DOWNLOAD:
-				status = server_wrap_upload(cfd, buf, udir);
-				break;
-			case INVALID:
-				if ((send(cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1) {
-					perror("send() #3 in handle_client()");
-					goto cleanup;
-				}
-				break;
-			}
-
-			/* TODO: Unset global session info */
-			if (rt != INVALID) {
-				;
-			}
-			// --- NOTE - fin }}}
-
-			/*
-			 * TODO: Watch the top of the answer queue. When an answer appears
-			 * that contains the UUID this client generated, pop this {struct
-			 * answer}
-			 */
-
-			if (status != 0)
-				fprintf(stderr, "Error ocurred in threaded operation\n");
-		}
+		if (status != 0)
+			fprintf(stderr, "Error ocurred in threaded operation\n");
 
 	cleanup:
 		printf(YELLOW "Thread performing cleanup\n");
 		free(buf);
+		free(wt);
 		if (close(cfd) == -1)
-			perror("close(cfd) in handle_client");
+			perror("close(cfd) in client_thread");
 	}
 
 	return NULL;
@@ -169,11 +178,7 @@ int main() {
 			goto cleanup;
 		}
 
-		sem_wait(&clients.empty);
-		sem_wait(&clients.mutex);
-		enqueue(clientQ, &cfd);
-		sem_post(&clients.mutex);
-		sem_post(&clients.queued);
+		add_task(clientTp, &cfd);
 	}
 
 cleanup:
@@ -181,14 +186,14 @@ cleanup:
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 	switch (status) {
 	case 0:
-		delete_queue(clientQ);
+		delete_threadpool(workerTp);
 	case 4:
 		delete_threadpool(clientTp);
 	case 3:
 		if ((close(sfd)) == -1)
 			perror("close(sfd)");
 	case 2:
-		/* is this right... ? */
+		/* CHECK: is this right... ? */
 		while (close_db() != 0)
 			usleep(100000);
 	case 1:
@@ -214,8 +219,8 @@ int init(int *sfd, struct sockaddr_in *saddr) {
 	if (clientTp == NULL)
 		return 3;
 
-	clientQ = create_queue(sizeof(int));
-	if (clientQ == NULL)
+	workerTp = create_threadpool(MAXCLIENTS, worker_thread);
+	if (workerTp == NULL)
 		return 4;
 
 	return 0;

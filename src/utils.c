@@ -34,7 +34,7 @@ uint8_t get_num_digits(__off_t n) {
 }
 
 /**
- * @detail if adding `add` bytes to `buf`, (whose maximum capacity is
+ * @details if adding `add` bytes to `buf`, (whose maximum capacity is
  * `size` and currently has `idx` bytes written), would overflow it, then double
  * `buf`. `size` is updated in this case.
  *
@@ -124,8 +124,10 @@ enum REQ_TYPE identify_req_type(const char *buf) {
  */
 int download_file(const char *fname, size_t bytes, int sfd) {
 	FILE *fp;
-	int bytesRead, toRead, ret = 0;
-	char *buf;
+	size_t bytesRead, toRead;
+	ssize_t n;
+	int ret	  = 0;
+	char *buf = NULL;
 
 	if ((fp = fopen(fname, "w")) == NULL) {
 		perror("fopen() in download()");
@@ -139,17 +141,18 @@ int download_file(const char *fname, size_t bytes, int sfd) {
 	}
 
 	while (bytes > 0) {
-
 		toRead = min(BUFSIZE, bytes);
 
-		if ((bytesRead = recv(sfd, buf, toRead, 0)) == -1) {
-			perror("recv() in download()");
+		if ((n = recv(sfd, buf, toRead, 0)) == -1) {
+			perror("recv() in download_file()");
 			ret = 3;
 			goto cleanup;
 		}
 
-		if (bytesRead != toRead) {
-			fprintf(stderr, "Error: socket read mismatch!\n");
+		bytesRead = n;
+
+		if (bytesRead < toRead) {
+			fprintf(stderr, "download_file(): socket read mismatch!\n");
 			ret = 4;
 			goto cleanup;
 		}
@@ -225,7 +228,7 @@ cleanup:
 }
 
 /**
- * @detail if we `recv` '$SUCCESS$' from the other side, then return 0, else
+ * @details if we `recv` '$SUCCESS$' from the other side, then return 0, else
  * print the error message in ERR*
  */
 int recv_success(int sockfd, const char *err) {
