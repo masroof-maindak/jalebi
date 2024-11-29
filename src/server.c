@@ -1,33 +1,21 @@
 #include <arpa/inet.h>
 #include <dirent.h>
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <uuid/uuid.h>
 
 #include "../include/auth.h"
-#include "../include/queue.h"
 #include "../include/server.h"
 #include "../include/threadpool.h"
 
 struct threadpool *clientTp = NULL;
 struct threadpool *workerTp = NULL;
 
-struct queue *answerQ = NULL;
-
-struct prodcons clients, answers;
-
 /* TODO: remove after complete */
 void add_task(struct threadpool *tp, void *task);
-
-/**
- * @brief pops an answer if it hasn't been picked up in 2 seconds
- */
-void *answer_thread_manager(void *arg __attribute__((unused))) { return NULL; }
 
 /**
  * @param arg a struct work_task holding details regarding a client's request
@@ -56,7 +44,7 @@ void *worker_thread(void *arg) {
 		 * the new task is a write task (irrespective of whatever is being
 		 * processed)
 		 * TODO(?): Extrapolate this to file-level granularity
-		 * NOTE : Global mutex dynamic array ?
+		 * NOTE : Global dynamic mutex array ?
 		 */
 		ans.status = server_wrap_download(wt->cfd, wt->buf, wt->udir);
 		break;
@@ -74,8 +62,7 @@ void *worker_thread(void *arg) {
 		;
 	}
 
-	/* TODO: mutual exclusion around q */
-	enqueue(answerQ, &ans);
+	/* TODO: mutual exclusion around hashmap */
 
 	return NULL;
 }
@@ -127,19 +114,14 @@ void *client_thread(void *arg) {
 			goto cleanup;
 		}
 
-		/* push the {struct task} to a worker queue, alongside a randomly
-		 * generated UUID. */
+		/* push task to worker queue, alongside random UUID. */
 		wt->buf	 = buf;
 		wt->cfd	 = cfd;
 		wt->udir = udir;
 		uuid_generate_random(wt->uuid);
 		add_task(workerTp, wt);
 
-		/*
-		 * TODO: Watch the top of the answer queue. When an answer appears
-		 * that contains the UUID this client generated, pop this {struct
-		 * answer}
-		 */
+		/* TODO: Watch answer hashmap for this thread's answer */
 		memset(wt, 0, sizeof(*wt));
 
 		if (status != 0)
@@ -150,7 +132,7 @@ void *client_thread(void *arg) {
 		free(buf);
 		free(wt);
 		if (close(cfd) == -1)
-			perror("close(cfd) in client_thread");
+			perror("close(cfd) in client_thread()");
 	}
 
 	return NULL;
@@ -195,13 +177,10 @@ cleanup:
 	}
 #pragma GCC diagnostic pop
 
-	destroy_producer_consumer(&clients);
 	return status;
 }
 
 int init(int *sfd, struct sockaddr_in *saddr) {
-	init_producer_consumer(&clients, MAXCLIENTS);
-
 	if (ensure_dir_exists(HOSTDIR) == false || init_db() != 0)
 		return 1;
 
@@ -458,7 +437,7 @@ __off_t get_used_space(const char *dir) {
 int64_t authenticate_and_get_uid(int cfd, char *buf) {
 	char mode, un[PW_MAX_LEN + 1], pw[PW_MAX_LEN + 1];
 	uint8_t unL, pwL;
-	int64_t uid = -1;
+	int64_t uid;
 
 	if (recv(cfd, buf, BUFSIZE, 0) == -1) {
 		perror("recv() in authenticate_and_get_uid()");
@@ -476,16 +455,4 @@ int64_t authenticate_and_get_uid(int cfd, char *buf) {
 	un[unL] = pw[pwL] = '\0';
 	uid = (mode == 'L') ? verify_user(un, pw) : register_user(un, pw);
 	return uid;
-}
-
-void init_producer_consumer(struct prodcons *pc, int empty) {
-	sem_init(&pc->queued, 0, 0);
-	sem_init(&pc->empty, 0, empty);
-	sem_init(&pc->mutex, 0, 1);
-}
-
-void destroy_producer_consumer(struct prodcons *pc) {
-	sem_destroy(&pc->queued);
-	sem_destroy(&pc->empty);
-	sem_destroy(&pc->mutex);
 }
