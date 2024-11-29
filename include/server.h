@@ -27,6 +27,15 @@ struct answer {
 #define MAXCLIENTS		 8
 #define MAX_CLIENT_SPACE 10 * 1024 * 1024
 
+#define PRINT_SEM_VALUE(sem, name, clr)                                        \
+	do {                                                                       \
+		int val;                                                               \
+		if (sem_getvalue(&(sem), &val) == 0)                                   \
+			printf("%s%s: %d\n", (clr), (name), val);                          \
+		else                                                                   \
+			perror("sem_getvalue() in PRINT_SEM_VALUE");                       \
+	} while (0)
+
 void *client_thread(void *arg);
 void *worker_thread(void *arg);
 

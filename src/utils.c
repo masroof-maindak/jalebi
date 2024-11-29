@@ -1,4 +1,5 @@
 #include <dirent.h>
+#include <linux/limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,7 +38,7 @@ uint8_t get_num_digits(__off_t n) {
  * `size` and currently has `idx` bytes written), would overflow it, then double
  * `buf`. `size` is updated in this case.
  *
- * @return
+ * @return NULL on failure, buffer on success
  */
 char *double_if_Of(char *buf, size_t idx, size_t add, size_t *size) {
 	char *tmp = NULL;
@@ -75,22 +76,26 @@ ssize_t view(char *buf, size_t size, const char *udir) {
 		if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, ".."))
 			continue;
 
-		sprintf(upath, "%s/%s", udir, ent->d_name);
+		if (snprintf(upath, PATH_MAX, "%s/%s", udir, ent->d_name) < 0) {
+			idx = -2;
+			goto cleanup;
+		}
+
 		if ((stat(upath, &inf)) != 0) {
 			perror("stat() in view()");
-			idx = -2;
+			idx = -3;
 			goto cleanup;
 		}
 
 		entLen = strlen(ent->d_name) + get_num_digits(inf.st_size) + 5;
 		if ((buf = double_if_Of(buf, idx, entLen, &size)) == NULL) {
-			idx = -3;
+			idx = -4;
 			goto cleanup;
 		}
 
 		n = snprintf(buf + idx, entLen, "%s - %ld\n", ent->d_name, inf.st_size);
 		if (n < 0) {
-			idx = -4;
+			idx = -5;
 			goto cleanup;
 		}
 
@@ -104,11 +109,11 @@ cleanup:
 }
 
 enum REQ_TYPE identify_req_type(const char *buf) {
-	if (!strncmp(buf, "$VIEW$", 6))
+	if (strncmp(buf, "$VIEW$", 6) == 0)
 		return VIEW;
-	else if (!strncmp(buf, "$DOWNLOAD$", 10))
+	else if (strncmp(buf, "$DOWNLOAD$", 10) == 0)
 		return DOWNLOAD;
-	else if (!strncmp(buf, "$UPLOAD$", 8))
+	else if (strncmp(buf, "$UPLOAD$", 8) == 0)
 		return UPLOAD;
 	return -1;
 }
@@ -149,11 +154,12 @@ int download_file(const char *fname, size_t bytes, int sfd) {
 			goto cleanup;
 		}
 
-		fwrite(buf, bytesRead, 1, fp);
-		if (ferror(fp)) {
-			perror("fwrite() in download()");
-			ret = 5;
-			goto cleanup;
+		if (fwrite(buf, 1, bytesRead, fp) < bytesRead) {
+			if (ferror(fp)) {
+				perror("fwrite() in download()");
+				ret = 5;
+				goto cleanup;
+			}
 		}
 
 		bytes -= toRead;
@@ -191,16 +197,16 @@ int upload_file(const char *fname, size_t bytes, int sfd) {
 		toWrite = min(BUFSIZE, bytes);
 
 		bytesRead = fread(buf, 1, toWrite, fp);
-		if (ferror(fp)) {
-			perror("fread() in upload()");
-			ret = 3;
-			goto cleanup;
-		}
-
 		if (bytesRead != toWrite) {
-			fprintf(stderr, "Error: file read mismatch!");
-			ret = 4;
-			goto cleanup;
+			if (feof(fp)) {
+				fprintf(stderr, "fread() in upload_file - EOF occurred");
+				ret = 3;
+				goto cleanup;
+			} else if (ferror(fp)) {
+				perror("fread() in upload_file()");
+				ret = 4;
+				goto cleanup;
+			}
 		}
 
 		if (send(sfd, buf, bytesRead, 0) == -1) {
