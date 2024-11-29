@@ -34,15 +34,10 @@ void *answer_thread_manager(void *arg __attribute__((unused))) { return NULL; }
  */
 void *worker_thread(void *arg) {
 	struct work_task *wt = arg;
-	struct answer *ans	 = NULL;
+	struct answer ans;
 
-	ans = malloc(sizeof(*ans));
-	if (ans == NULL) {
-		perror("malloc() in worker_thread()");
-	}
-
-	ans->status = -1;
-	uuid_copy(ans->uuid, wt->uuid);
+	ans.status = -1;
+	uuid_copy(ans.uuid, wt->uuid);
 
 	enum REQ_TYPE rt = identify_req_type(wt->buf);
 
@@ -53,7 +48,7 @@ void *worker_thread(void *arg) {
 
 	switch (rt) {
 	case VIEW:
-		ans->status = server_wrap_view(wt->cfd, wt->udir);
+		ans.status = server_wrap_view(wt->cfd, wt->udir);
 		break;
 	case UPLOAD:
 		/*
@@ -63,10 +58,10 @@ void *worker_thread(void *arg) {
 		 * TODO(?): Extrapolate this to file-level granularity
 		 * NOTE : Global mutex dynamic array ?
 		 */
-		ans->status = server_wrap_download(wt->cfd, wt->buf, wt->udir);
+		ans.status = server_wrap_download(wt->cfd, wt->buf, wt->udir);
 		break;
 	case DOWNLOAD:
-		ans->status = server_wrap_upload(wt->cfd, wt->buf, wt->udir);
+		ans.status = server_wrap_upload(wt->cfd, wt->buf, wt->udir);
 		break;
 	case INVALID:
 		if ((send(wt->cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1)
@@ -80,8 +75,7 @@ void *worker_thread(void *arg) {
 	}
 
 	/* TODO: mutual exclusion around q */
-	enqueue(answerQ, ans);
-	free(ans);
+	enqueue(answerQ, &ans);
 
 	return NULL;
 }
