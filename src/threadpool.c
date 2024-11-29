@@ -1,7 +1,6 @@
 #include <pthread.h>
 #include <stdio.h>
 
-#include "../include/queue.h"
 #include "../include/threadpool.h"
 
 /**
