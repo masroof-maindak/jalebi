@@ -55,12 +55,11 @@ struct threadpool *create_threadpool(size_t n, size_t elemSize,
 }
 
 /**
- * @brief if work is available, execute it
- */
+ * @brief if work is available, pass it to the user-designated entrypoint; the
+ * user should free the argument after they are done using it */
 void *internal_f(void *arg) {
 	void *task;
 	struct threadpool *tp = (struct threadpool *)arg;
-
 	for (;;) {
 		pthread_mutex_lock(&tp->lock);
 		while (tp->q->size == 0)

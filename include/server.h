@@ -6,17 +6,17 @@
 #include "bool.h"
 #include "utils.h"
 
-struct work_task {
+typedef struct {
 	int cfd;
 	char *buf;
 	char *udir;
 	uuid_t uuid;
-};
+} worker_task;
 
-struct answer {
+typedef struct {
 	int status;
 	uuid_t uuid;
-};
+} answer;
 
 #define MAXCLIENTS		 8
 #define MAX_CLIENT_SPACE 10 * 1024 * 1024

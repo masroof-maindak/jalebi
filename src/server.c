@@ -11,18 +11,15 @@
 #include "../include/server.h"
 #include "../include/threadpool.h"
 
-struct threadpool *clientTp = NULL;
-struct threadpool *workerTp = NULL;
-
-/* TODO: remove after complete */
-void add_task(struct threadpool *tp, void *task);
+struct threadpool *commTp = NULL; /* Comm. threads for auth/receiving work */
+struct threadpool *workTp = NULL; /* internal threads for task-completion */
 
 /**
  * @param arg a struct work_task holding details regarding a client's request
  */
 void *worker_thread(void *arg) {
-	struct work_task *wt = arg;
-	struct answer ans;
+	worker_task *wt = arg;
+	answer ans;
 
 	ans.status = -1;
 	uuid_copy(ans.uuid, wt->uuid);
@@ -64,6 +61,7 @@ void *worker_thread(void *arg) {
 
 	/* TODO: mutual exclusion around hashmap */
 
+	free(arg);
 	return NULL;
 }
 
@@ -71,12 +69,13 @@ void *worker_thread(void *arg) {
  * @brief this thread will handle authentication and receiving a client's tasks
  */
 void *client_thread(void *arg) {
-	int cfd				 = *(int *)arg;
-	int status			 = 0;
-	int64_t uid			 = -1;
-	char *buf			 = NULL;
-	struct work_task *wt = NULL;
-	char udir[PATH_MAX]	 = "\0";
+	int cfd				= *(int *)arg;
+	int status			= 0;
+	int64_t uid			= -1;
+	char *buf			= NULL;
+	worker_task *wt		= NULL;
+	char udir[PATH_MAX] = "\0";
+	free(arg);
 
 	buf = malloc(BUFSIZE);
 	if (buf == NULL) {
@@ -119,7 +118,7 @@ void *client_thread(void *arg) {
 		wt->cfd	 = cfd;
 		wt->udir = udir;
 		uuid_generate_random(wt->uuid);
-		add_task(workerTp, wt);
+		add_task(workTp, wt);
 
 		/* TODO: Watch answer hashmap for this thread's answer */
 		memset(wt, 0, sizeof(*wt));
@@ -154,7 +153,7 @@ int main() {
 			goto cleanup;
 		}
 
-		add_task(clientTp, &cfd);
+		add_task(commTp, &cfd);
 	}
 
 cleanup:
@@ -162,9 +161,9 @@ cleanup:
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 	switch (status) {
 	case 0:
-		delete_threadpool(workerTp);
+		delete_threadpool(workTp);
 	case 4:
-		delete_threadpool(clientTp);
+		delete_threadpool(commTp);
 	case 3:
 		if ((close(sfd)) == -1)
 			perror("close(sfd)");
@@ -188,12 +187,12 @@ int init(int *sfd, struct sockaddr_in *saddr) {
 	if (*sfd < 0)
 		return 2;
 
-	clientTp = create_threadpool(MAXCLIENTS, client_thread);
-	if (clientTp == NULL)
+	commTp = create_threadpool(MAXCLIENTS, sizeof(int), client_thread);
+	if (commTp == NULL)
 		return 3;
 
-	workerTp = create_threadpool(MAXCLIENTS, worker_thread);
-	if (workerTp == NULL)
+	workTp = create_threadpool(MAXCLIENTS, sizeof(worker_task), worker_thread);
+	if (workTp == NULL)
 		return 4;
 
 	return 0;

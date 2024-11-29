@@ -23,7 +23,7 @@ sudo apt install libsqlite3-dev libssl-dev libreadline-dev libbsd-dev
 
 - [x] Threadpool -> incorporate queue where arbitrary tasks are pushed to
 - [x] Worker thread entrypoint
-    - [ ] Global session management
+    - [ ] Global session management - hashmap
     - [x] Process task
     - [ ] Mark answer in hashmap & signal communication thread
 
