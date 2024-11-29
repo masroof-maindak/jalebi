@@ -1,13 +1,14 @@
 #include <pthread.h>
 #include <stdio.h>
-#include <stdlib.h>
 
+#include "../include/queue.h"
 #include "../include/threadpool.h"
 
 /**
- * @brief create `n` threads, running `fp` function
+ * @brief create `n` threads, w/ entrypoint `fp`, and tasks of size `elemSize`
  */
-struct threadpool *create_threadpool(size_t n, void *(*fp)(void *)) {
+struct threadpool *create_threadpool(size_t n, size_t elemSize,
+									 void *(*fp)(void *)) {
 	if (n == 0)
 		return NULL;
 
@@ -25,7 +26,7 @@ struct threadpool *create_threadpool(size_t n, void *(*fp)(void *)) {
 		return NULL;
 	}
 
-	tp->q = malloc(sizeof(struct queue));
+	tp->q = create_queue(elemSize);
 	if (tp->q == NULL) {
 		perror("malloc() in create_tp() - queue");
 		free(tp->threads);
@@ -90,6 +91,7 @@ void delete_threadpool(struct threadpool *tp) {
 	if (tp == NULL)
 		return;
 	/* TODO: destroy mutex & cond_var */
+	delete_queue(tp->q);
 	free(tp->threads);
 	free(tp);
 }

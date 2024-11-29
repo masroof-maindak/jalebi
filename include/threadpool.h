@@ -14,8 +14,11 @@ struct threadpool {
 	pthread_cond_t notify;
 };
 
-void *internal_f(void *arg);
-struct threadpool *create_threadpool(size_t n, void *(*fp)(void *));
+struct threadpool *create_threadpool(size_t n, size_t elemSize,
+									 void *(*fp)(void *));
 void delete_threadpool(struct threadpool *tp);
+
+void *internal_f(void *arg);
+void add_task(struct threadpool *tp, void *data);
 
 #endif // THREADPOOL_H_H
