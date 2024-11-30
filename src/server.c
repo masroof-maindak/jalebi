@@ -30,11 +30,10 @@ void *worker_thread(void *arg) {
 	uuid_copy(ans.uuid, wt->uuid);
 
 	enum REQ_TYPE rt = identify_req_type(wt->buf);
-
 	/* TODO: Set global session info */
 	pthread_mutex_lock(&uidMapMut);
 	while (1 /* new RT is not invalid &&
-				existing value for RT against this uid is W ||
+				existing value for RT against this uid is W||
 				existing value for RT against this uid is R and new RT is W */)
 		pthread_cond_wait(/* get this from hashmap too I think */);
 	pthread_mutex_unlock(&uidMapMut);

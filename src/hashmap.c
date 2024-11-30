@@ -54,12 +54,55 @@ int free_answer_map(struct answer_map **map) {
 	return 0;
 }
 
-int free_map(struct answer_map **map) {
+
+
+
+bool add_to_user_map(struct user_map **map, int64_t key, struct user_info ui){
+	struct user_map *entry = malloc(sizeof(struct user_map));
+	if (entry == NULL)
+		return false;
+
+	entry->uid = key;
+	entry->ui  = ui;
+	HASH_ADD_INT(*map, uid, entry);
+	return true;
+}
+
+struct user_info *get_userinfo(struct user_map *map, int64_t key) {
+	struct user_map *entry;
+	HASH_FIND_INT(map, &key, entry);
+	if (entry == NULL)
+		return NULL;
+
+	return &entry->ui;
+}
+
+int delete_from_user_map(struct user_map **map, int64_t key) {
+	struct user_map *entry;
+	HASH_FIND_INT(*map, &key, entry);
+
+	if (entry == NULL)
+		return -1;
+
+	pthread_cond_destroy(&entry->ui.condVar);
+	HASH_DEL(*map, entry);
+	free(entry);
+	return 0;
+}
+
+bool key_exists_user_map(struct user_map *map, int64_t key) {
+	struct user_map *entry;
+	HASH_FIND_INT(map, &key, entry);
+	return entry ? true : false;
+}
+
+int free_user_map(struct user_map **map) {
 	if (map == NULL || *map == NULL)
 		return -1;
 
-	struct answer_map *current_entry, *tmp;
+	struct user_map *current_entry, *tmp;
 	HASH_ITER(hh, *map, current_entry, tmp) {
+		pthread_cond_destroy(&current_entry->ui.condVar);
 		HASH_DEL(*map, current_entry);
 		free(current_entry);
 	}
