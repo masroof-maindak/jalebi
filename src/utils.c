@@ -116,7 +116,7 @@ enum REQ_TYPE identify_req_type(const char *buf) {
 		return DOWNLOAD;
 	else if (strncmp(buf, "$UPLOAD$", 8) == 0)
 		return UPLOAD;
-	return -1;
+	return INVALID;
 }
 
 /**
