@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <uuid/uuid.h>
 
-#include "../include/answers.h"
+#include "../include/server.h"
 #include "../include/hashmap.h"
 
-int add_to_map(struct hashmap **map, uuid_t key, struct answer *answers) {
+int add_to_map(struct hashmap **map, uuid_t key, answer *answers) {
 	struct hashmap *entry = malloc(sizeof(struct hashmap));
 	if (entry == NULL) {
 		perror("malloc() in add_to_map()");
@@ -30,7 +30,7 @@ int delete_from_map(struct hashmap **map, uuid_t key) {
 	return 0;
 }
 
-struct answer *get_answers(struct hashmap *map, uuid_t key) {
+answer *get_answers(struct hashmap *map, uuid_t key) {
 	struct hashmap *entry;
 	HASH_FIND(hh, map, key, sizeof(uuid_t), entry);
 	if (entry == NULL) {
