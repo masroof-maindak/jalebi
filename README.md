@@ -35,10 +35,11 @@ sudo apt install libsqlite3-dev libssl-dev libreadline-dev libbsd-dev uuid-dev
 
 ---
 
+- [ ] Extrapolate readers-writers problem to file-level granularity
 - [ ] encoding/decoding
     - [ ] use an algorithm that guarantees a smaller result
     - [ ] function pointer-ed upload and download logic
 
 ### Credits
 
-- [Uthash](https://github.com/troydhanson/uthash)
+- [uthash](https://github.com/troydhanson/uthash)

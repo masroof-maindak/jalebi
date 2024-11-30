@@ -26,27 +26,25 @@ void *worker_thread(void *arg) {
 	worker_task *wt = arg;
 	answer ans;
 
-	ans.status = -1;
+	ans.status = 0;
 	uuid_copy(ans.uuid, wt->uuid);
 
 	enum REQ_TYPE rt = identify_req_type(wt->buf);
 
 	/* TODO: Set global session info */
-	if (rt != INVALID) {
-		;
-	}
+	pthread_mutex_lock(&uidMapMut);
+	while (1 /* new RT is not invalid &&
+				existing value for RT against this uid is W ||
+				existing value for RT against this uid is R and new RT is W */)
+		pthread_cond_wait(/* get this from hashmap too I think */);
+	pthread_mutex_unlock(&uidMapMut);
+	/* ----------------------------- */
 
 	switch (rt) {
 	case VIEW:
 		ans.status = server_wrap_view(wt->cfd, wt->udir);
 		break;
 	case UPLOAD:
-		/*
-		 * TODO: Block this task if a write task is currently being processed or
-		 * the new task is a write task (irrespective of whatever is being
-		 * processed)
-		 * TODO(?): Extrapolate this to file-level granularity
-		 */
 		ans.status = server_wrap_download(wt->cfd, wt->buf, wt->udir);
 		break;
 	case DOWNLOAD:
@@ -55,14 +53,26 @@ void *worker_thread(void *arg) {
 	case INVALID:
 		if ((send(wt->cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1)
 			perror("send() in worker_thread()");
-		break;
+		goto write_answer;
 	}
 
 	/* TODO: Unset global session info */
-	if (rt != INVALID) {
-		;
-	}
+	pthread_mutex_lock(&uidMapMut);
+	/*
+	 * CHECK: is signalling/destroying correct?
+	 * signal & destroy the cond var obtained from the hashmap
+	 *
+	 * If there's nothing waiting, then signal affects nothing.
+	 * If there's something waiting, it will get to retry the while's condition
+	 *
+	 * If the thread is the final one on its way out, destroy will destroy it
+	 * If it isn't destroy will fail because someone is waiting on it and that's
+	 * acceptable too
+	 */
+	pthread_mutex_unlock(&uidMapMut);
+	/* ------------------------------- */
 
+write_answer:
 	/* write answer to hashmap */
 	pthread_mutex_lock(&answerMapMut);
 	if (add_to_answer_map(&uuidToAns, wt->uuid, &ans))
