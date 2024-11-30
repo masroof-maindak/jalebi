@@ -6,6 +6,7 @@
 - libbsd
 - SQLite3
 - OpenSSL
+- libuuid
 
 #### Arch
 
