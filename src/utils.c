@@ -1,5 +1,4 @@
 #include <dirent.h>
-#include <linux/limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -127,18 +126,12 @@ int download_file(const char *fname, size_t bytes, int sfd) {
 	FILE *fp;
 	size_t bytesRead, toRead;
 	ssize_t n;
-	int ret	  = 0;
-	char *buf = NULL;
+	int ret			  = 0;
+	char buf[BUFSIZE] = {0};
 
 	if ((fp = fopen(fname, "w")) == NULL) {
 		perror("fopen() in download()");
 		return 1;
-	}
-
-	if ((buf = malloc(BUFSIZE)) == NULL) {
-		perror("malloc() in download()");
-		fclose(fp);
-		return 2;
 	}
 
 	while (bytes > 0) {
@@ -154,14 +147,14 @@ int download_file(const char *fname, size_t bytes, int sfd) {
 
 		if (bytesRead < toRead) {
 			fprintf(stderr, "download_file(): socket read mismatch!\n");
-			ret = 4;
+			ret = 3;
 			goto cleanup;
 		}
 
 		if (fwrite(buf, 1, bytesRead, fp) < bytesRead) {
 			if (ferror(fp)) {
 				perror("fwrite() in download()");
-				ret = 5;
+				ret = 4;
 				goto cleanup;
 			}
 		}
@@ -170,7 +163,6 @@ int download_file(const char *fname, size_t bytes, int sfd) {
 	}
 
 cleanup:
-	free(buf);
 	fclose(fp);
 	return ret;
 }
@@ -183,17 +175,11 @@ cleanup:
 int upload_file(const char *fname, size_t bytes, int sfd) {
 	FILE *fp;
 	int bytesRead, toWrite, ret = 0;
-	char *buf;
+	char buf[BUFSIZE] = {0};
 
 	if ((fp = fopen(fname, "r")) == NULL) {
 		perror("fopen() in upload()");
 		return 1;
-	}
-
-	if ((buf = malloc(BUFSIZE)) == NULL) {
-		perror("malloc() in upload()");
-		fclose(fp);
-		return 2;
 	}
 
 	while (bytes > 0) {
@@ -204,18 +190,18 @@ int upload_file(const char *fname, size_t bytes, int sfd) {
 		if (bytesRead != toWrite) {
 			if (feof(fp)) {
 				fprintf(stderr, "fread() in upload_file - EOF occurred");
-				ret = 3;
+				ret = 2;
 				goto cleanup;
 			} else if (ferror(fp)) {
 				perror("fread() in upload_file()");
-				ret = 4;
+				ret = 3;
 				goto cleanup;
 			}
 		}
 
 		if (send(sfd, buf, bytesRead, 0) == -1) {
 			perror("send() in upload()");
-			ret = 5;
+			ret = 4;
 			goto cleanup;
 		}
 
@@ -223,7 +209,6 @@ int upload_file(const char *fname, size_t bytes, int sfd) {
 	}
 
 cleanup:
-	free(buf);
 	fclose(fp);
 	return ret;
 }
