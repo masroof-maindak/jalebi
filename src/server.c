@@ -1,48 +1,28 @@
 #include <arpa/inet.h>
 #include <dirent.h>
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <uuid/uuid.h>
 
 #include "../include/auth.h"
-#include "../include/queue.h"
 #include "../include/server.h"
 #include "../include/threadpool.h"
 
-struct threadpool *clientTp = NULL;
-struct threadpool *workerTp = NULL;
-
-struct queue *answerQ = NULL;
-
-struct prodcons clients, answers;
-
-/* TODO: remove after complete */
-void add_task(struct threadpool *tp, void *task);
-
-/**
- * @brief pops an answer if it hasn't been picked up in 2 seconds
- */
-void *answer_thread_manager(void *arg __attribute__((unused))) { return NULL; }
+struct threadpool *commTp = NULL; /* Comm. threads for auth/receiving work */
+struct threadpool *workTp = NULL; /* internal threads for task-completion */
 
 /**
  * @param arg a struct work_task holding details regarding a client's request
  */
 void *worker_thread(void *arg) {
-	struct work_task *wt = arg;
-	struct answer *ans	 = NULL;
+	worker_task *wt = arg;
+	answer ans;
 
-	ans = malloc(sizeof(*ans));
-	if (ans == NULL) {
-		perror("malloc() in worker_thread()");
-	}
-
-	ans->status = -1;
-	uuid_copy(ans->uuid, wt->uuid);
+	ans.status = -1;
+	uuid_copy(ans.uuid, wt->uuid);
 
 	enum REQ_TYPE rt = identify_req_type(wt->buf);
 
@@ -53,7 +33,7 @@ void *worker_thread(void *arg) {
 
 	switch (rt) {
 	case VIEW:
-		ans->status = server_wrap_view(wt->cfd, wt->udir);
+		ans.status = server_wrap_view(wt->cfd, wt->udir);
 		break;
 	case UPLOAD:
 		/*
@@ -61,12 +41,12 @@ void *worker_thread(void *arg) {
 		 * the new task is a write task (irrespective of whatever is being
 		 * processed)
 		 * TODO(?): Extrapolate this to file-level granularity
-		 * NOTE : Global mutex dynamic array ?
+		 * NOTE : Global dynamic mutex array ?
 		 */
-		ans->status = server_wrap_download(wt->cfd, wt->buf, wt->udir);
+		ans.status = server_wrap_download(wt->cfd, wt->buf, wt->udir);
 		break;
 	case DOWNLOAD:
-		ans->status = server_wrap_upload(wt->cfd, wt->buf, wt->udir);
+		ans.status = server_wrap_upload(wt->cfd, wt->buf, wt->udir);
 		break;
 	case INVALID:
 		if ((send(wt->cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1)
@@ -79,10 +59,9 @@ void *worker_thread(void *arg) {
 		;
 	}
 
-	/* TODO: mutual exclusion around q */
-	enqueue(answerQ, ans);
-	free(ans);
+	/* TODO: mutual exclusion around hashmap */
 
+	free(arg);
 	return NULL;
 }
 
@@ -90,12 +69,13 @@ void *worker_thread(void *arg) {
  * @brief this thread will handle authentication and receiving a client's tasks
  */
 void *client_thread(void *arg) {
-	int cfd				 = *(int *)arg;
-	int status			 = 0;
-	int64_t uid			 = -1;
-	char *buf			 = NULL;
-	struct work_task *wt = NULL;
-	char udir[PATH_MAX]	 = "\0";
+	int cfd				= *(int *)arg;
+	int status			= 0;
+	int64_t uid			= -1;
+	char *buf			= NULL;
+	worker_task *wt		= NULL;
+	char udir[PATH_MAX] = "\0";
+	free(arg);
 
 	buf = malloc(BUFSIZE);
 	if (buf == NULL) {
@@ -133,19 +113,14 @@ void *client_thread(void *arg) {
 			goto cleanup;
 		}
 
-		/* push the {struct task} to a worker queue, alongside a randomly
-		 * generated UUID. */
+		/* push task to worker queue, alongside random UUID. */
 		wt->buf	 = buf;
 		wt->cfd	 = cfd;
 		wt->udir = udir;
 		uuid_generate_random(wt->uuid);
-		add_task(workerTp, wt);
+		add_task(workTp, wt);
 
-		/*
-		 * TODO: Watch the top of the answer queue. When an answer appears
-		 * that contains the UUID this client generated, pop this {struct
-		 * answer}
-		 */
+		/* TODO: Watch answer hashmap for this thread's answer */
 		memset(wt, 0, sizeof(*wt));
 
 		if (status != 0)
@@ -156,7 +131,7 @@ void *client_thread(void *arg) {
 		free(buf);
 		free(wt);
 		if (close(cfd) == -1)
-			perror("close(cfd) in client_thread");
+			perror("close(cfd) in client_thread()");
 	}
 
 	return NULL;
@@ -178,7 +153,7 @@ int main() {
 			goto cleanup;
 		}
 
-		add_task(clientTp, &cfd);
+		add_task(commTp, &cfd);
 	}
 
 cleanup:
@@ -186,9 +161,9 @@ cleanup:
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 	switch (status) {
 	case 0:
-		delete_threadpool(workerTp);
+		delete_threadpool(workTp);
 	case 4:
-		delete_threadpool(clientTp);
+		delete_threadpool(commTp);
 	case 3:
 		if ((close(sfd)) == -1)
 			perror("close(sfd)");
@@ -201,13 +176,10 @@ cleanup:
 	}
 #pragma GCC diagnostic pop
 
-	destroy_producer_consumer(&clients);
 	return status;
 }
 
 int init(int *sfd, struct sockaddr_in *saddr) {
-	init_producer_consumer(&clients, MAXCLIENTS);
-
 	if (ensure_dir_exists(HOSTDIR) == false || init_db() != 0)
 		return 1;
 
@@ -215,12 +187,12 @@ int init(int *sfd, struct sockaddr_in *saddr) {
 	if (*sfd < 0)
 		return 2;
 
-	clientTp = create_threadpool(MAXCLIENTS, client_thread);
-	if (clientTp == NULL)
+	commTp = create_threadpool(MAXCLIENTS, sizeof(int), client_thread);
+	if (commTp == NULL)
 		return 3;
 
-	workerTp = create_threadpool(MAXCLIENTS, worker_thread);
-	if (workerTp == NULL)
+	workTp = create_threadpool(MAXCLIENTS, sizeof(worker_task), worker_thread);
+	if (workTp == NULL)
 		return 4;
 
 	return 0;
@@ -464,7 +436,7 @@ __off_t get_used_space(const char *dir) {
 int64_t authenticate_and_get_uid(int cfd, char *buf) {
 	char mode, un[PW_MAX_LEN + 1], pw[PW_MAX_LEN + 1];
 	uint8_t unL, pwL;
-	int64_t uid = -1;
+	int64_t uid;
 
 	if (recv(cfd, buf, BUFSIZE, 0) == -1) {
 		perror("recv() in authenticate_and_get_uid()");
@@ -482,16 +454,4 @@ int64_t authenticate_and_get_uid(int cfd, char *buf) {
 	un[unL] = pw[pwL] = '\0';
 	uid = (mode == 'L') ? verify_user(un, pw) : register_user(un, pw);
 	return uid;
-}
-
-void init_producer_consumer(struct prodcons *pc, int empty) {
-	sem_init(&pc->queued, 0, 0);
-	sem_init(&pc->empty, 0, empty);
-	sem_init(&pc->mutex, 0, 1);
-}
-
-void destroy_producer_consumer(struct prodcons *pc) {
-	sem_destroy(&pc->queued);
-	sem_destroy(&pc->empty);
-	sem_destroy(&pc->mutex);
 }

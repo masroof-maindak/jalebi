@@ -33,14 +33,6 @@
 
 enum REQ_TYPE { VIEW = 1, DOWNLOAD, UPLOAD, INVALID };
 
-struct client_request
-{
-    int id;
-    REQUEST reqType;
-    char* msg;
-};
-
-
 char *copy_string(const char *str);
 enum REQ_TYPE identify_req_type(const char *buf);
 int recv_success(int sockfd, const char *err);

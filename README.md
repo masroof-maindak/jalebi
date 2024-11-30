@@ -21,21 +21,18 @@ sudo apt install libsqlite3-dev libssl-dev libreadline-dev libbsd-dev
 
 ### Todo
 
-- [ ] Threadpool -> incorporate queue
-- [ ] Worker thread function
-    - [x] Worker queue
-    - [ ] Global session management
-        - [ ] Dynamic mutex array?
+- [x] Threadpool -> incorporate queue where arbitrary tasks are pushed to
+- [x] Worker thread entrypoint
+    - [ ] Global session management - hashmap
     - [x] Process task
-    - [ ] Push answer to answer queue
+    - [ ] Mark answer in hashmap & signal communication thread
 
 ---
 
 - [ ] Thread monitoring - Restart killed threads, etc.
     - How to find out a thread's died?
-- [ ] close() -> shutdown() for sockets ???
-- [ ] Signal handlers; gracefully deal w/ sockets/readline(?)/database/threadpool (!!!)
-- [ ] Queue -> don't deep-copy data, just pass pointers around
+- [ ] close() -> shutdown() for sockets ?
+- [ ] Signal handlers; gracefully deal w/ sockets/readline(?)/database/threadpool/etc.
 
 ---
 

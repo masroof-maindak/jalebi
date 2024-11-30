@@ -15,7 +15,7 @@ BINDIR = $(PREFIX)/bin
 
 COMMON_FILES = utils encode
 CLIENT_FILES = client $(COMMON_FILES)
-SERVER_FILES = server auth encode queue threadpool answer $(COMMON_FILES)
+SERVER_FILES = server auth encode queue threadpool prodcons $(COMMON_FILES)
 
 CLIENT_OBJS = $(addprefix $(BUILDDIR)/,$(CLIENT_FILES:=.o))
 SERVER_OBJS = $(addprefix $(BUILDDIR)/,$(SERVER_FILES:=.o))
