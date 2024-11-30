@@ -65,6 +65,12 @@ void *internal_f(void *arg) {
 		while (tp->q->size == 0)
 			pthread_cond_wait(&tp->notify, &tp->lock);
 		task = copy_top(tp->q);
+		
+		if (task == NULL) {
+			/* CHECK: what to do now? */
+			return NULL;
+		}
+		
 		dequeue(tp->q);
 		pthread_mutex_unlock(&tp->lock);
 
