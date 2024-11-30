@@ -3,7 +3,7 @@
 
 #include <uuid/uuid.h>
 
-#include "answer.h"
+#include "server.h"
 #include "uthash.h"
 
 struct hashmap {
