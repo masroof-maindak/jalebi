@@ -1,8 +1,9 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-#include <uuid/uuid.h>
+#include <pthread.h>
 
+#include "answer.h"
 #include "bool.h"
 #include "utils.h"
 
@@ -11,12 +12,8 @@ typedef struct {
 	char *buf;
 	char *udir;
 	uuid_t uuid;
+	pthread_cond_t *cond;
 } worker_task;
-
-typedef struct {
-	int status;
-	uuid_t uuid;
-} answer;
 
 #define MAXCLIENTS		 8
 #define MAX_CLIENT_SPACE 10 * 1024 * 1024
