@@ -1,7 +1,7 @@
 #ifndef HASHMAP_H
 #define HASHMAP_H
 
-#include "server.h"
+#include "answer.h"
 #include "uthash.h"
 #include <uuid/uuid.h>
 
