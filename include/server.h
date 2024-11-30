@@ -1,6 +1,8 @@
 #ifndef SERVER_H
 #define SERVER_H
 
+#include <pthread.h>
+
 #include "answer.h"
 #include "bool.h"
 #include "utils.h"
@@ -10,6 +12,7 @@ typedef struct {
 	char *buf;
 	char *udir;
 	uuid_t uuid;
+	pthread_cond_t *cond;
 } worker_task;
 
 #define MAXCLIENTS		 8

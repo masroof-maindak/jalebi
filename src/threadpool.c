@@ -11,7 +11,7 @@ struct threadpool *create_threadpool(size_t n, size_t elemSize,
 	if (n == 0)
 		return NULL;
 
-	struct threadpool *tp = malloc(sizeof(struct threadpool));
+	struct threadpool *tp = malloc(sizeof(*tp));
 	if (tp == NULL) {
 		perror("malloc() in create_tp() - tp");
 		return NULL;
@@ -65,12 +65,11 @@ void *internal_f(void *arg) {
 		while (tp->q->size == 0)
 			pthread_cond_wait(&tp->notify, &tp->lock);
 		task = copy_top(tp->q);
-		
-		if (task == NULL) {
-			/* CHECK: what to do now? */
-			return NULL;
-		}
-		
+
+		if (task == NULL)
+			/* CHECK: how to clean up? */
+			continue;
+
 		dequeue(tp->q);
 		pthread_mutex_unlock(&tp->lock);
 
@@ -87,7 +86,6 @@ void add_task(struct threadpool *tp, void *data) {
 	pthread_mutex_lock(&tp->lock);
 	enqueue(tp->q, data);
 	pthread_mutex_unlock(&tp->lock);
-
 	pthread_cond_signal(&tp->notify);
 }
 

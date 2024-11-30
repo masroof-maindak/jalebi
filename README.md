@@ -10,13 +10,13 @@
 #### Arch
 
 ```bash
-sudo pacman -S lib32-sqlite lib32-openssl readline libbsd
+sudo pacman -S lib32-sqlite lib32-openssl readline libbsd util-linux
 ```
 
 #### Debian
 
 ```bash
-sudo apt install libsqlite3-dev libssl-dev libreadline-dev libbsd-dev
+sudo apt install libsqlite3-dev libssl-dev libreadline-dev libbsd-dev uuid-dev
 ```
 
 ### Todo
@@ -25,10 +25,11 @@ sudo apt install libsqlite3-dev libssl-dev libreadline-dev libbsd-dev
 - [x] Worker thread entrypoint
     - [ ] Global session management - hashmap
     - [x] Process task
-    - [ ] Mark answer in hashmap & signal communication thread
+    - [x] Mark answer in hashmap & signal communication thread
 
 ---
 
+- [ ] Refactor struct answer to simply be an enum status (the uuid\_t in the struct is unnecessary)
 - [ ] Thread monitoring - Restart killed threads, etc.
     - How to find out a thread's died?
 - [ ] close() -> shutdown() for sockets ?

@@ -8,11 +8,16 @@
 #include <unistd.h>
 
 #include "../include/auth.h"
+#include "../include/hashmap.h"
 #include "../include/server.h"
 #include "../include/threadpool.h"
 
-struct threadpool *commTp = NULL; /* Comm. threads for auth/receiving work */
-struct threadpool *workTp = NULL; /* internal threads for task-completion */
+struct threadpool *commTp	 = NULL; /* Comm. threads for auth/receiving work */
+struct threadpool *workTp	 = NULL; /* internal threads for task-completion */
+struct answer_map *uuidToAns = NULL;
+struct user_map *uidToReqType = NULL;
+pthread_mutex_t answerMapMut  = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t uidMapMut	  = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * @param arg a struct work_task holding details regarding a client's request
@@ -41,7 +46,6 @@ void *worker_thread(void *arg) {
 		 * the new task is a write task (irrespective of whatever is being
 		 * processed)
 		 * TODO(?): Extrapolate this to file-level granularity
-		 * NOTE : Global dynamic mutex array ?
 		 */
 		ans.status = server_wrap_download(wt->cfd, wt->buf, wt->udir);
 		break;
@@ -59,7 +63,13 @@ void *worker_thread(void *arg) {
 		;
 	}
 
-	/* TODO: mutual exclusion around hashmap */
+	/* write answer to hashmap */
+	pthread_mutex_lock(&answerMapMut);
+	if (add_to_answer_map(&uuidToAns, wt->uuid, &ans))
+		/* TODO: we're cooked so just kill this thread */
+		perror("malloc() in add_to_answer_map()");
+	pthread_cond_signal(wt->cond);
+	pthread_mutex_unlock(&answerMapMut);
 
 	free(arg);
 	return NULL;
@@ -72,20 +82,14 @@ void *client_thread(void *arg) {
 	int cfd				= *(int *)arg;
 	int status			= 0;
 	int64_t uid			= -1;
-	char *buf			= NULL;
+	char buf[BUFSIZE]	= {0};
 	worker_task *wt		= NULL;
 	char udir[PATH_MAX] = "\0";
 	free(arg);
 
-	buf = malloc(BUFSIZE);
-	if (buf == NULL) {
-		perror("malloc() #1 in client_thread() - buf");
-		goto cleanup;
-	}
-
 	wt = malloc(sizeof(*wt));
 	if (wt == NULL) {
-		perror("malloc() #2 in client_thread - wt");
+		perror("malloc() in client_thread() - wt");
 		goto cleanup;
 	}
 
@@ -104,7 +108,7 @@ void *client_thread(void *arg) {
 	}
 
 	while (status == 0) {
-		ssize_t n = recv(cfd, buf, BUFSIZE, 0);
+		ssize_t n = recv(cfd, buf, sizeof(buf), 0);
 		if (n == -1) {
 			perror("recv() in client_thread()");
 			goto cleanup;
@@ -117,22 +121,34 @@ void *client_thread(void *arg) {
 		wt->buf	 = buf;
 		wt->cfd	 = cfd;
 		wt->udir = udir;
+		pthread_cond_init(wt->cond, NULL);
 		uuid_generate_random(wt->uuid);
 		add_task(workTp, wt);
 
-		/* TODO: Watch answer hashmap for this thread's answer */
+		/* watch answer hashmap */
+		/* TODO: timedwait + kill thread if no answer */
+		answer *ans = NULL;
+		pthread_mutex_lock(&answerMapMut);
+		while ((ans = get_answers(uuidToAns, wt->uuid)) == NULL)
+			pthread_cond_wait(wt->cond, &answerMapMut);
+		status = ans->status;
+		delete_from_answer_map(&uuidToAns, wt->uuid);
+		pthread_mutex_unlock(&answerMapMut);
+
+		/* cleanup for next iteration */
+		pthread_cond_destroy(wt->cond);
 		memset(wt, 0, sizeof(*wt));
+		memset(buf, 0, sizeof(buf));
 
 		if (status != 0)
 			fprintf(stderr, "Error ocurred in threaded operation\n");
-
-	cleanup:
-		printf(YELLOW "Thread performing cleanup\n");
-		free(buf);
-		free(wt);
-		if (close(cfd) == -1)
-			perror("close(cfd) in client_thread()");
 	}
+
+cleanup:
+	printf(YELLOW "Thread performing cleanup\n");
+	free(wt);
+	if (close(cfd) == -1)
+		perror("close(cfd) in client_thread()");
 
 	return NULL;
 }
@@ -157,25 +173,27 @@ int main() {
 	}
 
 cleanup:
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 	switch (status) {
 	case 0:
 		delete_threadpool(workTp);
+		/* FALLTHRU */
 	case 4:
 		delete_threadpool(commTp);
+		/* FALLTHRU */
 	case 3:
 		if ((close(sfd)) == -1)
 			perror("close(sfd)");
+		/* FALLTHRU */
 	case 2:
 		/* CHECK: is this right... ? */
 		while (close_db() != 0)
 			usleep(100000);
+		/* FALLTHRU */
 	case 1:
 		break;
 	}
-#pragma GCC diagnostic pop
 
+	free_answer_map(&uuidToAns);
 	return status;
 }
 
