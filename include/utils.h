@@ -1,9 +1,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include <linux/limits.h>
 #include <stdint.h>
-#include <sys/types.h>
+#include <stdlib.h>
 
 #define PW_MAX_LEN		  31
 #define PW_MIN_LEN		  4
@@ -33,6 +32,7 @@
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
 enum REQ_TYPE { VIEW = 1, DOWNLOAD, UPLOAD, INVALID };
+enum STATUS { SUCCESS = 0, FAILURE, MALLOC_FAIL, SEND_FAIL, RECV_FAIL };
 
 char *copy_string(const char *str);
 enum REQ_TYPE identify_req_type(const char *buf);

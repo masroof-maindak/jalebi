@@ -285,7 +285,7 @@ int init_server_socket(struct sockaddr_in *saddr) {
  *
  * @param buf the buffer containing the request $DOWNLOAD$<fname>$
  */
-int server_wrap_upload(int cfd, const char *buf, const char *udir) {
+enum STATUS server_wrap_upload(int cfd, const char *buf, const char *udir) {
 	size_t fsize;
 	char const *fname;
 	char fpath[PATH_MAX];
@@ -294,36 +294,36 @@ int server_wrap_upload(int cfd, const char *buf, const char *udir) {
 	fname = buf + 10;
 
 	if (snprintf(fpath, sizeof(fpath), "%s/%s", udir, fname) < 0)
-		return -1;
+		return FAILURE;
 
 	if (stat(fpath, &st) != 0) {
 		if (send(cfd, DLOAD_FAIL_MSG, sizeof(DLOAD_FAIL_MSG), 0) == -1) {
 			perror("send() #1 in server_wrap_upload()");
-			return -2;
+			return SEND_FAIL;
 		}
-		return 0;
+		return SUCCESS;
 	}
 
 	fsize = st.st_size;
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send() #2 in server_wrap_upload()");
-		return -3;
+		return SEND_FAIL;
 	}
 
 	/* TODO: timeout if no response for a while */
 	if ((recv_success(cfd, "Client never acknowledged receive")) < 0)
-		return -4;
+		return SUCCESS;
 
 	if (send(cfd, &fsize, sizeof(fsize), 0) == -1) {
 		perror("send() #3 in server_wrap_upload()");
-		return -5;
+		return SEND_FAIL;
 	}
 
 	if (upload_file(fpath, fsize, cfd) < 0)
-		return -6;
+		return FAILURE;
 
-	return 0;
+	return SUCCESS;
 }
 
 /**
@@ -339,7 +339,7 @@ int server_wrap_upload(int cfd, const char *buf, const char *udir) {
  *
  * @param buf the buffer containing the request $UPLOAD$<fname>$
  */
-int server_wrap_download(int cfd, const char *buf, const char *udir) {
+enum STATUS server_wrap_download(int cfd, const char *buf, const char *udir) {
 	size_t fsize;
 	char const *fname;
 	char fpath[PATH_MAX], *err = NULL;
@@ -347,14 +347,14 @@ int server_wrap_download(int cfd, const char *buf, const char *udir) {
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send() #1 in server_wrap_download()");
-		return -2;
+		return SEND_FAIL;
 	}
 
 	fname = buf + 8;
 
 	if (recv(cfd, &fsize, sizeof(fsize), 0) == -1) {
 		perror("recv() in server_wrap_download()");
-		return -3;
+		return RECV_FAIL;
 	}
 
 	usedSpace = get_used_space(udir);
@@ -367,47 +367,47 @@ int server_wrap_download(int cfd, const char *buf, const char *udir) {
 	if (err != NULL) {
 		if (send(cfd, err, strlen(err), 0) == -1)
 			perror("send() #2 in server_wrap_download()");
-		return -4;
+		return SEND_FAIL;
 	}
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send() #3 in server_wrap_download()");
-		return -5;
+		return SEND_FAIL;
 	}
 
 	if (snprintf(fpath, sizeof(fpath), "%s/%s", udir, fname) < 0)
-		return -6;
+		return FAILURE;
 
 	if (download_file(fpath, fsize, cfd) != 0)
-		return -7;
+		return FAILURE;
 
 	if (send(cfd, SUCCESS_MSG, sizeof(SUCCESS_MSG), 0) == -1) {
 		perror("send() #4 in server_wrap_download()");
-		return -8;
+		return SEND_FAIL;
 	}
 
 	return 0;
 }
 
-int server_wrap_view(int cfd, const char *udir) {
-	int status = 0;
+enum STATUS server_wrap_view(int cfd, const char *udir) {
+	enum STATUS st = SUCCESS;
 	ssize_t idx;
 	char *buf;
 
 	if ((buf = malloc(BUFSIZE)) == NULL) {
 		perror("malloc() in server_wrap_view()");
-		return -1;
+		return MALLOC_FAIL;
 	}
 
 	/* get list of entries + size and send latter */
 	if ((idx = view(buf, BUFSIZE, udir)) < 0) {
-		status = -2;
+		st = FAILURE;
 		goto cleanup;
 	}
 
 	if ((send(cfd, &idx, sizeof(idx), 0)) == -1) {
 		perror("send() #1 in server_wrap_view()");
-		status = -3;
+		st = SEND_FAIL;
 		goto cleanup;
 	}
 
@@ -419,14 +419,14 @@ int server_wrap_view(int cfd, const char *udir) {
 	for (int i = 0; idx > 0; i++, idx -= BUFSIZE) {
 		if ((send(cfd, buf + (i << 10), min(BUFSIZE, idx), 0)) == -1) {
 			perror("send() #2 in server_wrap_view()");
-			status = -4;
+			st = SEND_FAIL;
 			goto cleanup;
 		}
 	}
 
 cleanup:
 	free(buf);
-	return status;
+	return st;
 }
 
 bool ensure_dir_exists(char *d) {

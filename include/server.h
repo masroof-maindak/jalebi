@@ -28,8 +28,8 @@ int init_server_socket(struct sockaddr_in *saddr);
 int64_t authenticate_and_get_uid(int cfd, char *buf);
 __off_t get_used_space(const char *dir);
 
-int server_wrap_view(int cfd, const char *udir);
-int server_wrap_upload(int cfd, const char *buf, const char *udir);
-int server_wrap_download(int cfd, const char *buf, const char *udir);
+enum STATUS server_wrap_view(int cfd, const char *udir);
+enum STATUS server_wrap_upload(int cfd, const char *buf, const char *udir);
+enum STATUS server_wrap_download(int cfd, const char *buf, const char *udir);
 
 #endif // SERVER_H

@@ -8,8 +8,6 @@
 #include "uthash.h"
 #include "utils.h"
 
-enum STATUS { SUCCESS = 0, FAILURE = 1 };
-
 /* uuid_t -> status */
 /* To let a client uniquely identify the status of it's task */
 struct task_status_map {
