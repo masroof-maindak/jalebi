@@ -30,12 +30,33 @@ void *worker_thread(void *arg) {
 	uuid_copy(ans.uuid, wt->uuid);
 
 	enum REQ_TYPE rt = identify_req_type(wt->buf);
+
+	if (rt == INVALID) {
+		if ((send(wt->cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1)
+			perror("send() in worker_thread()");
+		goto write_answer;
+	}
+
 	/* TODO: Set global session info */
 	pthread_mutex_lock(&uidMapMut);
-	while (1 /* new RT is not invalid &&
-				existing value for RT against this uid is W||
-				existing value for RT against this uid is R and new RT is W */)
-		pthread_cond_wait(/* get this from hashmap too I think */);
+	while (1 /* existing vaule for RT against this UID is not NULL &&
+				existing value for RT against this uid is W ||
+				existing value for RT against this uid is R and new RT is W */) {
+		pthread_cond_t *condVar = NULL; /* get this from the entry */
+		pthread_cond_wait(condVar, &uidMapMut);
+	}
+
+	/*
+	 * If we're here, there is either no entry for this UID in the hashmap
+	 * or the existing entry has no conflict with the new request type
+	 */
+
+	if (1 /* !conflict(entry, uid) [for now, this is just entry != NULL] */) {
+		/* update */
+	} else {
+		/* add_entry_to_map(uid, {reqType, newlyAllocatedCondVar}) */
+	}
+
 	pthread_mutex_unlock(&uidMapMut);
 	/* ----------------------------- */
 
@@ -49,10 +70,8 @@ void *worker_thread(void *arg) {
 	case DOWNLOAD:
 		ans.status = server_wrap_upload(wt->cfd, wt->buf, wt->udir);
 		break;
-	case INVALID:
-		if ((send(wt->cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1)
-			perror("send() in worker_thread()");
-		goto write_answer;
+	default:
+		break;
 	}
 
 	/* TODO: Unset global session info */
