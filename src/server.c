@@ -14,20 +14,21 @@
 #include "../include/server.h"
 #include "../include/threadpool.h"
 
-struct threadpool *commTp = NULL; /* Comm. threads for auth/receiving work */
-struct threadpool *workTp = NULL; /* internal threads for task-completion */
+struct tpool *commTp = NULL; /* Comm. threads to auth/recv. tasks */
+struct tpool *workTp = NULL; /* internal threads to complete tasks */
+
 struct task_status_map *uuidToStatus = NULL;
 struct user_tasks_map *uidToTasks	 = NULL;
-pthread_mutex_t answerMapMut		 = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t uidTasksMut			 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t statusMapMut		 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t tasksMapMut			 = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * @param arg a struct work_task holding details regarding a client's request
  */
 void *worker_thread(void *arg) {
-	worker_task *wt = arg;
-	task_list *uts	= get_user_tasks(uidToTasks, wt->uid);
-	enum STATUS st	= FAILURE;
+	worker_task *wt	  = arg;
+	task_list *uTasks = get_user_tasks(uidToTasks, wt->uid);
+	enum STATUS st	  = FAILURE;
 
 	wt->load.rt = identify_req_type(wt->load.buf);
 	if (wt->load.rt == INVALID) {
@@ -37,27 +38,30 @@ void *worker_thread(void *arg) {
 	}
 
 	/* Set global session info */
-	pthread_mutex_lock(&uidTasksMut);
-	while (uts && !is_conflicting(&wt->load, uts))
-		pthread_cond_wait(&uts->userCond, &uidTasksMut);
+	pthread_mutex_lock(&tasksMapMut);
 
-	if (uts == NULL) {
+	while (uTasks != NULL && !is_conflicting(&wt->load, uTasks))
+		pthread_cond_wait(&uTasks->userCond, &tasksMapMut);
+
+	if (uTasks == NULL) {
 		if (!add_new_user(&uidToTasks, wt->uid)) {
 			/* TODO: we're cooked so try to gracefully terminate/restart(?) */
 			perror("malloc() in add_new_user()");
 		}
 
-		uts = get_user_tasks(uidToTasks, wt->uid);
+		uTasks = get_user_tasks(uidToTasks, wt->uid);
 	}
 
-	if (!append_task(&wt->load, uts)) {
+	pthread_mutex_unlock(&tasksMapMut);
+
+	/* add task to this user's list */
+	if (!append_task(&wt->load, uTasks)) {
 		if ((send(wt->cfd, OVERLOAD_MSG, sizeof(OVERLOAD_MSG), 0)) == -1)
 			perror("send() in worker_thread()");
 		goto write_answer;
 	}
 
-	pthread_mutex_unlock(&uidTasksMut);
-
+	/* perform task */
 	switch (wt->load.rt) {
 	case VIEW:
 		st = server_wrap_view(wt->cfd, wt->load.udir);
@@ -73,24 +77,22 @@ void *worker_thread(void *arg) {
 	}
 
 	/* Unset global session info */
-	pthread_mutex_lock(&uidTasksMut);
-	if (--uts->count == 0) {
+	pthread_mutex_lock(&tasksMapMut);
+	if (--uTasks->count == 0) {
 		delete_from_user_map(&uidToTasks, wt->uid);
 	} else {
-		remove_task_from_list(wt->load.uuid, uts);
-		pthread_cond_signal(&uts->userCond);
+		remove_task_from_list(wt->load.uuid, uTasks);
+		pthread_cond_signal(&uTasks->userCond);
 	}
-	pthread_mutex_unlock(&uidTasksMut);
-	/* ------------------------------- */
+	pthread_mutex_unlock(&tasksMapMut);
 
 write_answer:
-	/* write answer to hashmap */
-	pthread_mutex_lock(&answerMapMut);
+	pthread_mutex_lock(&statusMapMut);
 	if (!add_new_status(&uuidToStatus, wt->load.uuid, st))
 		/* TODO: we're cooked so try to gracefully terminate/restart(?) */
 		perror("malloc() in add_to_answer_map()");
 	pthread_cond_signal(&wt->statCond);
-	pthread_mutex_unlock(&answerMapMut);
+	pthread_mutex_unlock(&statusMapMut);
 
 	free(arg);
 	return NULL;
@@ -150,12 +152,12 @@ void *client_thread(void *arg) {
 		/* watch answer hashmap */
 		/* TODO: timedwait + kill thread if no answer */
 		enum STATUS *st = NULL;
-		pthread_mutex_lock(&answerMapMut);
+		pthread_mutex_lock(&statusMapMut);
 		while ((st = get_status(uuidToStatus, wt->load.uuid)) == NULL)
-			pthread_cond_wait(&wt->statCond, &answerMapMut);
+			pthread_cond_wait(&wt->statCond, &statusMapMut);
 		status = *st;
 		delete_from_status_map(&uuidToStatus, wt->load.uuid);
-		pthread_mutex_unlock(&answerMapMut);
+		pthread_mutex_unlock(&statusMapMut);
 
 		/* cleanup for next iteration */
 		pthread_cond_destroy(&wt->statCond);
@@ -197,10 +199,10 @@ int main() {
 cleanup:
 	switch (status) {
 	case 0:
-		delete_threadpool(workTp);
+		delete_tpool(workTp);
 		/* FALLTHRU */
 	case 4:
-		delete_threadpool(commTp);
+		delete_tpool(commTp);
 		/* FALLTHRU */
 	case 3:
 		if ((close(sfd)) == -1)
@@ -217,6 +219,8 @@ cleanup:
 
 	free_status_map(&uuidToStatus);
 	free_user_map(&uidToTasks);
+	pthread_mutex_destroy(&statusMapMut);
+	pthread_mutex_destroy(&tasksMapMut);
 	return status;
 }
 
@@ -228,11 +232,11 @@ int init(int *sfd, struct sockaddr_in *saddr) {
 	if (*sfd < 0)
 		return 2;
 
-	commTp = create_threadpool(MAXCLIENTS, sizeof(int), client_thread);
+	commTp = create_tpool(MAXCLIENTS, sizeof(int), client_thread);
 	if (commTp == NULL)
 		return 3;
 
-	workTp = create_threadpool(MAXCLIENTS, sizeof(worker_task), worker_thread);
+	workTp = create_tpool(MAXCLIENTS, sizeof(worker_task), worker_thread);
 	if (workTp == NULL)
 		return 4;
 

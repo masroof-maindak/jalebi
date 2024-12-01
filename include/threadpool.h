@@ -5,7 +5,7 @@
 
 #include "queue.h"
 
-struct threadpool {
+struct tpool {
 	size_t size;
 	struct queue *q;
 	pthread_t *threads;
@@ -14,11 +14,10 @@ struct threadpool {
 	pthread_cond_t notify;
 };
 
-struct threadpool *create_threadpool(size_t n, size_t elemSize,
-									 void *(*fp)(void *));
-void delete_threadpool(struct threadpool *tp);
+struct tpool *create_tpool(size_t n, size_t elemSize, void *(*fp)(void *));
+void delete_tpool(struct tpool *tp);
 
 void *internal_f(void *arg);
-void add_task(struct threadpool *tp, void *data);
+void add_task(struct tpool *tp, void *data);
 
 #endif // THREADPOOL_H_H

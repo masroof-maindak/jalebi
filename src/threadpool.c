@@ -6,12 +6,11 @@
 /**
  * @brief create `n` threads, w/ entrypoint `fp`, and tasks of size `elemSize`
  */
-struct threadpool *create_threadpool(size_t n, size_t elemSize,
-									 void *(*fp)(void *)) {
+struct tpool *create_tpool(size_t n, size_t elemSize, void *(*fp)(void *)) {
 	if (n == 0)
 		return NULL;
 
-	struct threadpool *tp = malloc(sizeof(*tp));
+	struct tpool *tp = malloc(sizeof(*tp));
 	if (tp == NULL) {
 		perror("malloc() in create_tp() - tp");
 		return NULL;
@@ -59,7 +58,7 @@ struct threadpool *create_threadpool(size_t n, size_t elemSize,
  * user should free the argument after they are done using it */
 void *internal_f(void *arg) {
 	void *task;
-	struct threadpool *tp = (struct threadpool *)arg;
+	struct tpool *tp = (struct tpool *)arg;
 	for (;;) {
 		pthread_mutex_lock(&tp->lock);
 		while (tp->q->size == 0)
@@ -80,16 +79,16 @@ void *internal_f(void *arg) {
 }
 
 /**
- * @brief add a task to the threadpool
+ * @brief add a task to the tpool
  */
-void add_task(struct threadpool *tp, void *data) {
+void add_task(struct tpool *tp, void *data) {
 	pthread_mutex_lock(&tp->lock);
 	enqueue(tp->q, data);
 	pthread_mutex_unlock(&tp->lock);
 	pthread_cond_signal(&tp->notify);
 }
 
-void delete_threadpool(struct threadpool *tp) {
+void delete_tpool(struct tpool *tp) {
 	if (tp == NULL)
 		return;
 	/* TODO: destroy mutex & cond_var */
