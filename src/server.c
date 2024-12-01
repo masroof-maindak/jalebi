@@ -31,17 +31,16 @@ void *worker_thread(void *arg) {
 	ans.status = 0;
 	uuid_copy(ans.uuid, wt->load.uuid);
 
-	enum REQ_TYPE rt = identify_req_type(wt->load.buf);
-	if (rt == INVALID) {
+	wt->load.rt = identify_req_type(wt->load.buf);
+	if (wt->load.rt == INVALID) {
 		if ((send(wt->cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1)
 			perror("send() in worker_thread()");
 		goto write_answer;
 	}
 
-	/* TODO: Set global session info */
+	/* Set global session info */
 	pthread_mutex_lock(&uidMapMut);
-	while (ui && (ui->rt == UPLOAD || (ui->rt == DOWNLOAD && rt == UPLOAD)
-				  /* TODO: more robust conflict handling */))
+	while (ui && !is_conflicting(&wt->load, ui))
 		pthread_cond_wait(&ui->condVar, &uidMapMut);
 
 	/*
@@ -49,23 +48,13 @@ void *worker_thread(void *arg) {
 	 * or the existing entry has no conflict with the new request type
 	 */
 
-	if (ui != NULL) {
-		/* FIXME: append the new request type and the client it came from */
-		ui->rt = rt;
-		if (update_value_in_user_map(&uidToReqType, wt->uid, *ui) < 0)
-			perror("worker_thread() - Failed to update the user map");
-	} else {
-		struct user_info new;
-		new.rt = rt;
-		pthread_cond_init(&new.condVar, NULL);
-		if (!add_to_user_map(&uidToReqType, wt->uid, new))
-			perror("worker_thread() - Failed to add to user map");
-	}
+	/* TODO: append the new request type and the client it came from */
+	/* the function should internally either create a new object or append */
 
 	pthread_mutex_unlock(&uidMapMut);
 	/* ----------------------------- */
 
-	switch (rt) {
+	switch (wt->load.rt) {
 	case VIEW:
 		ans.status = server_wrap_view(wt->cfd, wt->load.udir);
 		break;
@@ -79,9 +68,10 @@ void *worker_thread(void *arg) {
 		break;
 	}
 
-	/* TODO: Unset global session info */
+	/* Unset global session info */
 	pthread_mutex_lock(&uidMapMut);
 	/*
+	 * TODO: create a function that does the following internally:
 	 * if (--hashmap[uid].activeTaskCount == 0) {
 	 * 		delete_entry_from_hashmap(uid);
 	 * } else {
