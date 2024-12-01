@@ -22,8 +22,8 @@ sudo apt install libsqlite3-dev libssl-dev libreadline-dev libbsd-dev uuid-dev
 
 ### Todo
 
-- [ ] Worker -> user-level session management
-- [ ] Arena allocator
+- [x] Worker -> user-level session management
+- [x] Arena allocator
 
 ---
 
