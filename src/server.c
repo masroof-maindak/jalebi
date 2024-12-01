@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "../include/auth.h"
@@ -25,12 +26,14 @@ pthread_mutex_t uidMapMut	  = PTHREAD_MUTEX_INITIALIZER;
 void *worker_thread(void *arg) {
 	worker_task *wt = arg;
 	answer ans;
-
+	struct user_info *ui = get_userinfo(uidToReqType, wt->uid);
+	if (ui == NULL) {
+		// The entry does not exits.
+	}
 	ans.status = 0;
 	uuid_copy(ans.uuid, wt->uuid);
 
 	enum REQ_TYPE rt = identify_req_type(wt->buf);
-
 	if (rt == INVALID) {
 		if ((send(wt->cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1)
 			perror("send() in worker_thread()");
@@ -39,7 +42,7 @@ void *worker_thread(void *arg) {
 
 	/* TODO: Set global session info */
 	pthread_mutex_lock(&uidMapMut);
-	while (1 /* existing vaule for RT against this UID is not NULL &&
+	while (ui && (ui->rt == UPLOAD || (ui->rt == DOWNLOAD && rt == UPLOAD))/* existing vaule for RT against this UID is not NULL &&
 				existing value for RT against this uid is W ||
 				existing value for RT against this uid is R and new RT is W */) {
 		pthread_cond_t *condVar = NULL; /* get this from the entry */
@@ -51,9 +54,19 @@ void *worker_thread(void *arg) {
 	 * or the existing entry has no conflict with the new request type
 	 */
 
-	if (1 /* !conflict(entry, uid) [for now, this is just entry != NULL] */) {
+	if (ui != NULL/* !conflict(entry, uid) [for now, this is just entry != NULL] */) {
 		/* update */
+		ui->rt = rt;
+		if(update_value_in_user_map(&uidToReqType, wt->uid, *ui)< 0){
+			perror("worker_thread() - Failed to update the user map");
+		}
 	} else {
+		struct user_info new;
+		new.rt = rt;
+		pthread_cond_init(&new.condVar, NULL);
+		if (!add_to_user_map(&uidToReqType, wt->uid, new)) {
+			perror("worker_thread() - Failed to add to user map");
+		}
 		/* add_entry_to_map(uid, {reqType, newlyAllocatedCondVar}) */
 	}
 
@@ -76,6 +89,8 @@ void *worker_thread(void *arg) {
 
 	/* TODO: Unset global session info */
 	pthread_mutex_lock(&uidMapMut);
+    pthread_cond_signal(&ui->condVar);
+	delete_from_user_map(&uidToReqType, wt->uid);
 	/*
 	 * CHECK: is signalling/destroying correct?
 	 * signal & destroy the cond var obtained from the hashmap

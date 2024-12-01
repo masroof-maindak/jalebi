@@ -110,3 +110,15 @@ int free_user_map(struct user_map **map) {
 	*map = NULL;
 	return 0;
 }
+
+int update_value_in_user_map(struct user_map **map, int64_t key, struct user_info new_ui) {
+    if (map == NULL || *map == NULL)
+        return -1;
+    struct user_map *entry;
+    HASH_FIND_INT(*map, &key, entry);
+    if (entry == NULL)
+        return -2;
+    entry->ui = new_ui;
+
+    return 0;
+}

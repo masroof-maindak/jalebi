@@ -41,5 +41,5 @@ struct user_info *get_userinfo(struct user_map *map,int64_t key);
 int delete_from_user_map(struct user_map **map, int64_t key);
 bool key_exists_user_map(struct user_map *map, int64_t key);
 int free_user_map(struct user_map **map);
-
+int update_value_in_user_map(struct user_map **map, int64_t key, struct user_info new_ui);
 #endif
