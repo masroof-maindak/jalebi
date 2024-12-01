@@ -6,6 +6,7 @@
 #include <sqlite3.h>
 
 #include "../include/auth.h"
+#include "../include/utils.h"
 
 static sqlite3 *db;
 
@@ -29,53 +30,32 @@ int init_db() {
 	return 0;
 }
 
-int close_db() {
+bool close_db() {
 	int rc;
 	if ((rc = sqlite3_close(db)) != SQLITE_OK) {
 		fprintf(stderr, "sqlite3_close() in close_db(): %s\n",
 				sqlite3_errmsg(db));
-		return -1;
+		return false;
 	}
-	return 0;
+	return true;
 }
 
 /**
  * @brief Generates a random salt
  */
-char *generate_rand_salt() {
-	char *salt;
-	if ((salt = malloc(SALT_LENGTH + 1)) == NULL) {
-		perror("malloc() in get_salt()");
-		return NULL;
-	}
-
+void generate_rand_salt(char salt[SALT_LENGTH + 1]) {
 	srand(time(NULL));
-
 	for (int i = 0; i < SALT_LENGTH; i++)
 		salt[i] = ALPHA_NUMERIC[rand() % (sizeof(ALPHA_NUMERIC) - 1)];
-
 	salt[SALT_LENGTH] = '\0';
-	return salt;
 }
 
-/**
- * @brief Concatenates the password and salt
- */
-char *conc_salt_and_pw(const char *pw, const unsigned char *salt) {
-	size_t len = strlen(pw) + SALT_LENGTH + 1;
-	char *saltedPw;
-
-	if ((saltedPw = malloc(len)) == NULL) {
-		perror("malloc() in get_salted_pw()");
-		return NULL;
-	}
-
-	if (snprintf(saltedPw, len, "%s%s", pw, salt) < 0) {
-		free(saltedPw);
-		return NULL;
-	}
-
-	return saltedPw;
+bool conc_salt_and_pw(char pwSalt[PW_MAX_LEN + SALT_LENGTH + 1],
+					  const char pw[PW_MAX_LEN],
+					  const unsigned char salt[SALT_LENGTH]) {
+	return snprintf(pwSalt, PW_MAX_LEN + SALT_LENGTH + 1, "%s%s", pw, salt) < 0
+			   ? false
+			   : true;
 }
 
 /**
@@ -84,24 +64,18 @@ char *conc_salt_and_pw(const char *pw, const unsigned char *salt) {
  */
 int64_t register_user(const char *un, const char *pw) {
 	int64_t uid = -1;
-	char *pwSalt, *salt = generate_rand_salt();
+	char pwSalt[PW_MAX_LEN + SALT_LENGTH + 1], salt[SALT_LENGTH + 1];
 	unsigned char pwHash[SHA256_DIGEST_LENGTH];
 	sqlite3_stmt *stmt;
 
-	if (salt == NULL)
-		return -1;
-
-	if ((pwSalt = conc_salt_and_pw(pw, (const unsigned char *)salt)) == NULL) {
-		free(salt);
-		return -2;
-	}
-
+	generate_rand_salt(salt);
+	conc_salt_and_pw(pwSalt, pw, (const unsigned char *)salt);
 	SHA256((const unsigned char *)pwSalt, strlen(pwSalt), pwHash);
 
 	if (sqlite3_prepare_v2(db, INSERT_USER_SQL, -1, &stmt, NULL) != SQLITE_OK) {
 		fprintf(stderr, "sqlite3_prepare_v2() in register_user(): %s\n",
 				sqlite3_errmsg(db));
-		uid = -3;
+		uid = -2;
 		goto cleanup;
 	}
 
@@ -112,15 +86,13 @@ int64_t register_user(const char *un, const char *pw) {
 	if (sqlite3_step(stmt) != SQLITE_DONE) {
 		fprintf(stderr, "sqlite3_step() in register_user(): %s\n",
 				sqlite3_errmsg(db));
-		uid = -4;
+		uid = -3;
 		goto cleanup;
 	}
 
 	uid = sqlite3_last_insert_rowid(db);
 cleanup:
 	sqlite3_finalize(stmt);
-	free(pwSalt);
-	free(salt);
 	return uid;
 }
 
@@ -130,6 +102,7 @@ cleanup:
  */
 int64_t verify_user(const char *username, const char *pw) {
 	sqlite3_stmt *stmt;
+	char pwSalt[PW_MAX_LEN + SALT_LENGTH + 1];
 
 	if (sqlite3_prepare_v2(db, PW_SELECT_SQL, -1, &stmt, NULL) != SQLITE_OK) {
 		fprintf(stderr, "sqlite3_prepare_v2() in verify_user(): %s\n",
@@ -148,9 +121,8 @@ int64_t verify_user(const char *username, const char *pw) {
 	const unsigned char *dbPwHash = sqlite3_column_blob(stmt, 0);
 	const unsigned char *dbSalt	  = sqlite3_column_text(stmt, 1);
 	const int64_t uid			  = sqlite3_column_int(stmt, 2);
-	char *pwSalt				  = conc_salt_and_pw(pw, dbSalt);
 
-	if (pwSalt == NULL) {
+	if (!conc_salt_and_pw(pwSalt, pw, dbSalt)) {
 		sqlite3_finalize(stmt);
 		return -3;
 	}
@@ -161,11 +133,9 @@ int64_t verify_user(const char *username, const char *pw) {
 	/* Password mismatch */
 	if (memcmp(dbPwHash, pwHash, SHA256_DIGEST_LENGTH) != 0) {
 		sqlite3_finalize(stmt);
-		free(pwSalt);
 		return -4;
 	}
 
 	sqlite3_finalize(stmt);
-	free(pwSalt);
 	return uid;
 }
