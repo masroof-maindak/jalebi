@@ -55,7 +55,7 @@ bool add_new_user(struct user_tasks_map **map, int64_t key) {
 
 	newUser->uid	   = key;
 	newUser->ut->count = 0;
-	pthread_cond_init(&newUser->ut->condVar, NULL);
+	pthread_cond_init(&newUser->ut->userCond, NULL);
 
 	HASH_ADD_INT(*map, uid, newUser);
 	return true;
@@ -76,7 +76,7 @@ task_list *get_user_tasks(struct user_tasks_map *map, int64_t key) {
 void delete_from_user_map(struct user_tasks_map **map, int64_t key) {
 	struct user_tasks_map *entry = NULL;
 	HASH_FIND_INT(*map, &key, entry);
-	pthread_cond_destroy(&entry->ut->condVar);
+	pthread_cond_destroy(&entry->ut->userCond);
 	HASH_DEL(*map, entry);
 	free(entry);
 }
@@ -87,7 +87,7 @@ void free_user_map(struct user_tasks_map **map) {
 
 	struct user_tasks_map *currEntry, *tmp;
 	HASH_ITER(hh, *map, currEntry, tmp) {
-		pthread_cond_destroy(&currEntry->ut->condVar);
+		pthread_cond_destroy(&currEntry->ut->userCond);
 		HASH_DEL(*map, currEntry);
 		free(currEntry);
 	}

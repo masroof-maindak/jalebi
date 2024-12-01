@@ -38,7 +38,7 @@ void *worker_thread(void *arg) {
 	/* Set global session info */
 	pthread_mutex_lock(&uidTasksMut);
 	while (uts && !is_conflicting(&wt->load, uts))
-		pthread_cond_wait(&uts->condVar, &uidTasksMut);
+		pthread_cond_wait(&uts->userCond, &uidTasksMut);
 
 	if (uts == NULL && !add_new_user(&uidToTasks, wt->uid))
 		/* TODO: we're cooked so just kill this thread */
@@ -71,8 +71,8 @@ void *worker_thread(void *arg) {
 	if (--uts->count == 0) {
 		delete_from_user_map(&uidToTasks, wt->uid);
 	} else {
-		remove_this_uuids_task(hashmap, entry, uuid);
-		pthread_cond_signal(&uts->condVar);
+		remove_task_from_list(wt->load.uuid, uts);
+		pthread_cond_signal(&uts->userCond);
 	}
 	pthread_mutex_unlock(&uidTasksMut);
 	/* ------------------------------- */
@@ -83,7 +83,7 @@ write_answer:
 	if (add_to_status_map(&uuidToStatus, wt->load.uuid, st))
 		/* TODO: we're cooked so just kill this thread */
 		perror("malloc() in add_to_answer_map()");
-	pthread_cond_signal(wt->cond);
+	pthread_cond_signal(wt->statCond);
 	pthread_mutex_unlock(&answerMapMut);
 
 	free(arg);
@@ -98,13 +98,19 @@ void *client_thread(void *arg) {
 	int status			= 0;
 	int64_t uid			= -1;
 	char buf[BUFSIZE]	= {0};
-	worker_task *wt		= NULL;
 	char udir[PATH_MAX] = "\0";
+	worker_task *wt		= NULL;
 	free(arg);
 
 	wt = malloc(sizeof(*wt));
 	if (wt == NULL) {
 		perror("malloc() in client_thread() - wt");
+		goto cleanup;
+	}
+
+	wt->statCond = malloc(sizeof(*wt->statCond));
+	if (wt->statCond == NULL) {
+		perror("malloc() in client_thread() - wt->statCond");
 		goto cleanup;
 	}
 
@@ -135,7 +141,7 @@ void *client_thread(void *arg) {
 		/* push task to worker queue, alongside random UUID. */
 		wt->cfd = cfd;
 		wt->uid = uid;
-		pthread_cond_init(wt->cond, NULL);
+		pthread_cond_init(wt->statCond, NULL);
 		wt->load.buf  = buf;
 		wt->load.udir = udir;
 		uuid_generate_random(wt->load.uuid);
@@ -146,13 +152,13 @@ void *client_thread(void *arg) {
 		enum STATUS *st = NULL;
 		pthread_mutex_lock(&answerMapMut);
 		while ((st = get_status(uuidToStatus, wt->load.uuid)) == NULL)
-			pthread_cond_wait(wt->cond, &answerMapMut);
+			pthread_cond_wait(wt->statCond, &answerMapMut);
 		status = *st;
 		delete_from_status_map(&uuidToStatus, wt->load.uuid);
 		pthread_mutex_unlock(&answerMapMut);
 
 		/* cleanup for next iteration */
-		pthread_cond_destroy(wt->cond);
+		pthread_cond_destroy(wt->statCond);
 		memset(wt, 0, sizeof(*wt));
 		memset(buf, 0, sizeof(buf));
 
@@ -162,6 +168,7 @@ void *client_thread(void *arg) {
 
 cleanup:
 	printf(YELLOW "Thread performing cleanup\n");
+	free(wt->statCond);
 	free(wt);
 	if (close(cfd) == -1)
 		perror("close(cfd) in client_thread()");
