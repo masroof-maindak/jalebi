@@ -2,18 +2,20 @@
 
 #include "../include/hashmap.h"
 
-bool add_to_answer_map(struct status_map **map, uuid_t key, answer *answers) {
+bool add_to_status_map(struct status_map **map, uuid_t key,
+					   enum STATUS status) {
 	struct status_map *entry = malloc(sizeof(struct status_map));
 	if (entry == NULL)
 		return false;
 
 	uuid_copy(entry->uuid, key);
-	entry->answers = answers;
+	entry->st = status;
+
 	HASH_ADD_KEYPTR(hh, *map, entry->uuid, sizeof(uuid_t), entry);
 	return true;
 }
 
-int delete_from_answer_map(struct status_map **map, uuid_t key) {
+int delete_from_status_map(struct status_map **map, uuid_t key) {
 	struct status_map *entry;
 	HASH_FIND(hh, *map, key, sizeof(uuid_t), entry);
 
@@ -25,16 +27,23 @@ int delete_from_answer_map(struct status_map **map, uuid_t key) {
 	return 0;
 }
 
-answer *get_answers(struct status_map *map, uuid_t key) {
+enum STATUS *get_status(struct status_map *map, uuid_t key) {
 	struct status_map *entry;
 	HASH_FIND(hh, map, key, sizeof(uuid_t), entry);
+
 	if (entry == NULL)
 		return NULL;
 
-	return entry->answers;
+	return &entry->st;
 }
 
-int free_answer_map(struct status_map **map) {
+bool key_exists_status_map(struct status_map *map, uuid_t key) {
+	struct status_map *entry;
+	HASH_FIND(hh, map, key, sizeof(uuid_t), entry);
+	return entry ? true : false;
+}
+
+int free_status_map(struct status_map **map) {
 	if (map == NULL || *map == NULL)
 		return -1;
 
