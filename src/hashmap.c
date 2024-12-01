@@ -54,10 +54,7 @@ int free_answer_map(struct answer_map **map) {
 	return 0;
 }
 
-
-
-
-bool add_to_user_map(struct user_map **map, int64_t key, struct user_info ui){
+bool add_to_user_map(struct user_map **map, int64_t key, struct user_info ui) {
 	struct user_map *entry = malloc(sizeof(struct user_map));
 	if (entry == NULL)
 		return false;
@@ -111,14 +108,16 @@ int free_user_map(struct user_map **map) {
 	return 0;
 }
 
-int update_value_in_user_map(struct user_map **map, int64_t key, struct user_info new_ui) {
-    if (map == NULL || *map == NULL)
-        return -1;
-    struct user_map *entry;
-    HASH_FIND_INT(*map, &key, entry);
-    if (entry == NULL)
-        return -2;
-    entry->ui = new_ui;
+int update_value_in_user_map(struct user_map **map, int64_t key,
+							 struct user_info new_ui) {
+	if (map == NULL || *map == NULL)
+		return -1;
 
-    return 0;
+	struct user_map *entry;
+	HASH_FIND_INT(*map, &key, entry);
+	if (entry == NULL)
+		return -2;
+
+	entry->ui = new_ui;
+	return 0;
 }

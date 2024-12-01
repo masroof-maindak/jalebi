@@ -27,13 +27,11 @@ void *worker_thread(void *arg) {
 	worker_task *wt = arg;
 	answer ans;
 	struct user_info *ui = get_userinfo(uidToReqType, wt->uid);
-	if (ui == NULL) {
-		// The entry does not exits.
-	}
-	ans.status = 0;
-	uuid_copy(ans.uuid, wt->uuid);
 
-	enum REQ_TYPE rt = identify_req_type(wt->buf);
+	ans.status = 0;
+	uuid_copy(ans.uuid, wt->load.uuid);
+
+	enum REQ_TYPE rt = identify_req_type(wt->load.buf);
 	if (rt == INVALID) {
 		if ((send(wt->cfd, FAILURE_MSG, sizeof(FAILURE_MSG), 0)) == -1)
 			perror("send() in worker_thread()");
@@ -42,32 +40,26 @@ void *worker_thread(void *arg) {
 
 	/* TODO: Set global session info */
 	pthread_mutex_lock(&uidMapMut);
-	while (ui && (ui->rt == UPLOAD || (ui->rt == DOWNLOAD && rt == UPLOAD))/* existing vaule for RT against this UID is not NULL &&
-				existing value for RT against this uid is W ||
-				existing value for RT against this uid is R and new RT is W */) {
-		pthread_cond_t *condVar = NULL; /* get this from the entry */
-		pthread_cond_wait(condVar, &uidMapMut);
-	}
+	while (ui && (ui->rt == UPLOAD || (ui->rt == DOWNLOAD && rt == UPLOAD)
+				  /* TODO: more robust conflict handling */))
+		pthread_cond_wait(&ui->condVar, &uidMapMut);
 
 	/*
 	 * If we're here, there is either no entry for this UID in the hashmap
 	 * or the existing entry has no conflict with the new request type
 	 */
 
-	if (ui != NULL/* !conflict(entry, uid) [for now, this is just entry != NULL] */) {
-		/* update */
+	if (ui != NULL) {
+		/* FIXME: append the new request type and the client it came from */
 		ui->rt = rt;
-		if(update_value_in_user_map(&uidToReqType, wt->uid, *ui)< 0){
+		if (update_value_in_user_map(&uidToReqType, wt->uid, *ui) < 0)
 			perror("worker_thread() - Failed to update the user map");
-		}
 	} else {
 		struct user_info new;
 		new.rt = rt;
 		pthread_cond_init(&new.condVar, NULL);
-		if (!add_to_user_map(&uidToReqType, wt->uid, new)) {
+		if (!add_to_user_map(&uidToReqType, wt->uid, new))
 			perror("worker_thread() - Failed to add to user map");
-		}
-		/* add_entry_to_map(uid, {reqType, newlyAllocatedCondVar}) */
 	}
 
 	pthread_mutex_unlock(&uidMapMut);
@@ -75,13 +67,13 @@ void *worker_thread(void *arg) {
 
 	switch (rt) {
 	case VIEW:
-		ans.status = server_wrap_view(wt->cfd, wt->udir);
+		ans.status = server_wrap_view(wt->cfd, wt->load.udir);
 		break;
 	case UPLOAD:
-		ans.status = server_wrap_download(wt->cfd, wt->buf, wt->udir);
+		ans.status = server_wrap_download(wt->cfd, wt->load.buf, wt->load.udir);
 		break;
 	case DOWNLOAD:
-		ans.status = server_wrap_upload(wt->cfd, wt->buf, wt->udir);
+		ans.status = server_wrap_upload(wt->cfd, wt->load.buf, wt->load.udir);
 		break;
 	default:
 		break;
@@ -89,18 +81,13 @@ void *worker_thread(void *arg) {
 
 	/* TODO: Unset global session info */
 	pthread_mutex_lock(&uidMapMut);
-    pthread_cond_signal(&ui->condVar);
-	delete_from_user_map(&uidToReqType, wt->uid);
 	/*
-	 * CHECK: is signalling/destroying correct?
-	 * signal & destroy the cond var obtained from the hashmap
-	 *
-	 * If there's nothing waiting, then signal affects nothing.
-	 * If there's something waiting, it will get to retry the while's condition
-	 *
-	 * If the thread is the final one on its way out, destroy will destroy it
-	 * If it isn't destroy will fail because someone is waiting on it and that's
-	 * acceptable too
+	 * if (--hashmap[uid].activeTaskCount == 0) {
+	 * 		delete_entry_from_hashmap(uid);
+	 * } else {
+	 * 		remove_this_uuids_task(hashmap, entry, uuid);
+	 *		pthread_cond_signal(&ui->condVar);
+	 * }
 	 */
 	pthread_mutex_unlock(&uidMapMut);
 	/* ------------------------------- */
@@ -108,7 +95,7 @@ void *worker_thread(void *arg) {
 write_answer:
 	/* write answer to hashmap */
 	pthread_mutex_lock(&answerMapMut);
-	if (add_to_answer_map(&uuidToAns, wt->uuid, &ans))
+	if (add_to_answer_map(&uuidToAns, wt->load.uuid, &ans))
 		/* TODO: we're cooked so just kill this thread */
 		perror("malloc() in add_to_answer_map()");
 	pthread_cond_signal(wt->cond);
@@ -161,22 +148,22 @@ void *client_thread(void *arg) {
 		}
 
 		/* push task to worker queue, alongside random UUID. */
-		wt->buf	 = buf;
-		wt->cfd	 = cfd;
-		wt->udir = udir;
-		wt->uid	 = uid;
+		wt->cfd = cfd;
+		wt->uid = uid;
 		pthread_cond_init(wt->cond, NULL);
-		uuid_generate_random(wt->uuid);
+		wt->load.buf  = buf;
+		wt->load.udir = udir;
+		uuid_generate_random(wt->load.uuid);
 		add_task(workTp, wt);
 
 		/* watch answer hashmap */
 		/* TODO: timedwait + kill thread if no answer */
 		answer *ans = NULL;
 		pthread_mutex_lock(&answerMapMut);
-		while ((ans = get_answers(uuidToAns, wt->uuid)) == NULL)
+		while ((ans = get_answers(uuidToAns, wt->load.uuid)) == NULL)
 			pthread_cond_wait(wt->cond, &answerMapMut);
 		status = ans->status;
-		delete_from_answer_map(&uuidToAns, wt->uuid);
+		delete_from_answer_map(&uuidToAns, wt->load.uuid);
 		pthread_mutex_unlock(&answerMapMut);
 
 		/* cleanup for next iteration */
@@ -230,7 +217,7 @@ cleanup:
 		/* FALLTHRU */
 	case 2:
 		/* CHECK: is this right... ? */
-		while (close_db() != 0)
+		while (!close_db())
 			usleep(100000);
 		/* FALLTHRU */
 	case 1:

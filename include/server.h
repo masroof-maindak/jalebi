@@ -7,15 +7,6 @@
 #include "bool.h"
 #include "utils.h"
 
-typedef struct {
-	int cfd;
-	int64_t uid;
-	char *buf;
-	char *udir;
-	uuid_t uuid;
-	pthread_cond_t *cond;
-} worker_task;
-
 #define MAXCLIENTS		 8
 #define MAX_CLIENT_SPACE 10 * 1024 * 1024
 
