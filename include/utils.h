@@ -11,6 +11,7 @@
 #define BUFSIZE			  1024
 #define HOSTDIR			  "srv"
 #define FAILURE_MSG		  "$FAILURE$\n"
+#define OVERLOAD_MSG	  "$FAILURE$TOO_MANY_TASKS$\n"
 #define SUCCESS_MSG		  "$SUCCESS$\n"
 #define ULOAD_FAILURE_MSG "$FAILURE$LOW_SPACE$\n"
 #define DLOAD_FAIL_MSG	  "$FAILURE$FILE_NOT_FOUND$\n"

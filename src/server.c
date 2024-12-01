@@ -16,17 +16,17 @@
 struct threadpool *commTp	 = NULL; /* Comm. threads for auth/receiving work */
 struct threadpool *workTp	 = NULL; /* internal threads for task-completion */
 struct answer_map *uuidToAns = NULL;
-struct user_map *uidToReqType = NULL;
-pthread_mutex_t answerMapMut  = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t uidMapMut	  = PTHREAD_MUTEX_INITIALIZER;
+struct user_map *uidToTasks	 = NULL;
+pthread_mutex_t answerMapMut = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t uidTasksMut	 = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * @param arg a struct work_task holding details regarding a client's request
  */
 void *worker_thread(void *arg) {
 	worker_task *wt = arg;
+	user_tasks *uts = get_user_tasks(uidToTasks, wt->uid);
 	answer ans;
-	struct user_tasks *ut = get_usertasks(uidToReqType, wt->uid);
 
 	ans.status = 0;
 	uuid_copy(ans.uuid, wt->load.uuid);
@@ -39,20 +39,19 @@ void *worker_thread(void *arg) {
 	}
 
 	/* Set global session info */
-	pthread_mutex_lock(&uidMapMut);
-	while (ut && !is_conflicting(&wt->load, &ut->tasks))
-		pthread_cond_wait(&ut->condVar, &uidMapMut);
+	pthread_mutex_lock(&uidTasksMut);
+	while (uts && !is_conflicting(&wt->load, uts->tasks))
+		pthread_cond_wait(&uts->condVar, &uidTasksMut);
 
-	/*
-	 * If we're here, there is either no entry for this UID in the hashmap
-	 * or the existing entry has no conflict with the new request type
-	 */
+	(uts == NULL) && add_new_user(&uidToTasks, wt);
 
-	/* TODO: append the new request type and the client it came from */
-	/* the function should internally either create a new object or append */
+	if (!append_task(&wt->load, uts)) {
+		if ((send(wt->cfd, OVERLOAD_MSG, sizeof(OVERLOAD_MSG), 0)) == -1)
+			perror("send() in worker_thread()");
+		goto write_answer;
+	}
 
-	pthread_mutex_unlock(&uidMapMut);
-	/* ----------------------------- */
+	pthread_mutex_unlock(&uidTasksMut);
 
 	switch (wt->load.rt) {
 	case VIEW:
@@ -69,7 +68,7 @@ void *worker_thread(void *arg) {
 	}
 
 	/* Unset global session info */
-	pthread_mutex_lock(&uidMapMut);
+	pthread_mutex_lock(&uidTasksMut);
 	/*
 	 * TODO: create a function that does the following internally:
 	 * if (--hashmap[uid].activeTaskCount == 0) {
@@ -79,7 +78,7 @@ void *worker_thread(void *arg) {
 	 *		pthread_cond_signal(&ui->condVar);
 	 * }
 	 */
-	pthread_mutex_unlock(&uidMapMut);
+	pthread_mutex_unlock(&uidTasksMut);
 	/* ------------------------------- */
 
 write_answer:

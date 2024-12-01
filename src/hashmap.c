@@ -2,8 +2,8 @@
 
 #include "../include/hashmap.h"
 
-bool add_to_answer_map(struct answer_map **map, uuid_t key, answer *answers) {
-	struct answer_map *entry = malloc(sizeof(struct answer_map));
+bool add_to_answer_map(struct status_map **map, uuid_t key, answer *answers) {
+	struct status_map *entry = malloc(sizeof(struct status_map));
 	if (entry == NULL)
 		return false;
 
@@ -13,8 +13,8 @@ bool add_to_answer_map(struct answer_map **map, uuid_t key, answer *answers) {
 	return true;
 }
 
-int delete_from_answer_map(struct answer_map **map, uuid_t key) {
-	struct answer_map *entry;
+int delete_from_answer_map(struct status_map **map, uuid_t key) {
+	struct status_map *entry;
 	HASH_FIND(hh, *map, key, sizeof(uuid_t), entry);
 
 	if (entry == NULL)
@@ -25,8 +25,8 @@ int delete_from_answer_map(struct answer_map **map, uuid_t key) {
 	return 0;
 }
 
-answer *get_answers(struct answer_map *map, uuid_t key) {
-	struct answer_map *entry;
+answer *get_answers(struct status_map *map, uuid_t key) {
+	struct status_map *entry;
 	HASH_FIND(hh, map, key, sizeof(uuid_t), entry);
 	if (entry == NULL)
 		return NULL;
@@ -34,17 +34,17 @@ answer *get_answers(struct answer_map *map, uuid_t key) {
 	return entry->answers;
 }
 
-bool key_exists_answer_map(struct answer_map *map, uuid_t key) {
-	struct answer_map *entry;
+bool key_exists_answer_map(struct status_map *map, uuid_t key) {
+	struct status_map *entry;
 	HASH_FIND(hh, map, key, sizeof(uuid_t), entry);
 	return entry ? true : false;
 }
 
-int free_answer_map(struct answer_map **map) {
+int free_answer_map(struct status_map **map) {
 	if (map == NULL || *map == NULL)
 		return -1;
 
-	struct answer_map *current_entry, *tmp;
+	struct status_map *current_entry, *tmp;
 	HASH_ITER(hh, *map, current_entry, tmp) {
 		HASH_DEL(*map, current_entry);
 		free(current_entry);
@@ -54,28 +54,23 @@ int free_answer_map(struct answer_map **map) {
 	return 0;
 }
 
-bool add_to_user_map(struct user_map **map, int64_t key, struct user_tasks ut) {
-	struct user_map *entry = malloc(sizeof(struct user_map));
+bool add_new_user(struct user_map **map, worker_task *info) {
+	struct user_map *entry = malloc(sizeof(*entry));
 	if (entry == NULL)
 		return false;
 
-	entry->uid = key;
-	pthread_cond_init(&ut.condVar, NULL);
+	entry->ut.count = 0;
+	pthread_cond_init(&entry->ut.condVar);
 
-	entry->ut.condVar = ut.condVar;
-	entry->ut.count	  = ut.count;
-	entry->ut.tasks	  = ut.tasks;
-
-	HASH_ADD_INT(*map, uid, entry);
+	HASH_ADD_INT(*map, wt->uid, entry);
 	return true;
 }
 
-struct user_tasks *get_userinfo(struct user_map *map, int64_t key) {
+user_tasks *get_user_tasks(struct user_map *map, int64_t key) {
 	struct user_map *entry;
 	HASH_FIND_INT(map, &key, entry);
 	if (entry == NULL)
 		return NULL;
-
 	return &entry->ut;
 }
 
@@ -124,7 +119,7 @@ int free_user_map(struct user_map **map) {
 }
 
 int update_value_in_user_map(struct user_map **map, int64_t key,
-							 struct user_tasks new_ut) {
+							 user_tasks new_ut) {
 	if (map == NULL || *map == NULL)
 		return -1;
 
