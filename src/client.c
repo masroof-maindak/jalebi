@@ -287,7 +287,8 @@ int client_wrap_view(int sfd) {
 	}
 
 	if ((buf = malloc(idx + 1)) == NULL) {
-		perror("malloc() in client_wrap_view()");
+		fprintf(stderr, "malloc() in client_wrap_view() - %zd: %s\n", idx + 1,
+				strerror(errno));
 		return -3;
 	}
 
