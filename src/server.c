@@ -15,10 +15,10 @@
 
 struct threadpool *commTp = NULL; /* Comm. threads for auth/receiving work */
 struct threadpool *workTp = NULL; /* internal threads for task-completion */
-struct status_map *uuidToStatus	  = NULL;
-struct user_tasks_map *uidToTasks = NULL;
-pthread_mutex_t answerMapMut	  = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t uidTasksMut		  = PTHREAD_MUTEX_INITIALIZER;
+struct task_status_map *uuidToStatus = NULL;
+struct user_tasks_map *uidToTasks	 = NULL;
+pthread_mutex_t answerMapMut		 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t uidTasksMut			 = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * @param arg a struct work_task holding details regarding a client's request
@@ -80,7 +80,7 @@ void *worker_thread(void *arg) {
 write_answer:
 	/* write answer to hashmap */
 	pthread_mutex_lock(&answerMapMut);
-	if (add_to_status_map(&uuidToStatus, wt->load.uuid, st))
+	if (!add_new_status(&uuidToStatus, wt->load.uuid, st))
 		/* TODO: we're cooked so just kill this thread */
 		perror("malloc() in add_to_answer_map()");
 	pthread_cond_signal(wt->statCond);
@@ -217,6 +217,7 @@ cleanup:
 	}
 
 	free_status_map(&uuidToStatus);
+	free_user_map(&uidToTasks);
 	return status;
 }
 

@@ -6,7 +6,6 @@
 #include <sqlite3.h>
 
 #include "../include/auth.h"
-#include "../include/utils.h"
 
 static sqlite3 *db;
 

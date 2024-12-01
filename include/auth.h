@@ -4,6 +4,7 @@
 #include <openssl/sha.h>
 
 #include "bool.h"
+#include "utils.h"
 
 #define DATABASE_PATH "sqlite.db"
 #define SALT_LENGTH	  30
@@ -30,9 +31,10 @@
 int init_db();
 bool close_db();
 
-void generate_rand_salt(char *salt);
-bool conc_salt_and_pw(char pwSalt[], const char pw[],
-					  const unsigned char salt[]);
+void generate_rand_salt(char salt[SALT_LENGTH + 1]);
+bool conc_salt_and_pw(char pwSalt[PW_MAX_LEN + SALT_LENGTH + 1],
+					  const char pw[PW_MAX_LEN],
+					  const unsigned char salt[SALT_LENGTH]);
 
 int64_t register_user(const char *username, const char *password);
 int64_t verify_user(const char *username, const char *password);

@@ -12,23 +12,22 @@ enum STATUS { SUCCESS = 0, FAILURE = 1 };
 
 /* uuid_t -> status */
 /* To let a client uniquely identify the status of it's task */
-struct status_map {
+struct task_status_map {
 	uuid_t uuid;
 	enum STATUS st;
 	UT_hash_handle hh;
 };
 
-bool add_to_status_map(struct status_map **map, uuid_t key, enum STATUS status);
-enum STATUS *get_status(struct status_map *map, uuid_t key);
-int delete_from_status_map(struct status_map **map, uuid_t key);
-int free_status_map(struct status_map **map);
+bool add_new_status(struct task_status_map **map, uuid_t key, enum STATUS st);
+enum STATUS *get_status(struct task_status_map *map, uuid_t key);
+int delete_from_status_map(struct task_status_map **map, uuid_t key);
+int free_status_map(struct task_status_map **map);
 
-/* uid -> { cond_t, count, tasks } */
+/* uid -> { cond_t, count, tasks[16] } */
 /* To prevent conflict when completing tasks for a user */
-
 struct user_tasks_map {
 	int64_t uid;
-	task_list *ut;
+	task_list *tList;
 	UT_hash_handle hh;
 };
 
