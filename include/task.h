@@ -28,8 +28,7 @@ typedef struct {
 	task_payload tasks[MAX_TASK_COUNT];
 } user_tasks;
 
-bool is_conflicting(const task_payload *newTask,
-					task_payload userTasks[MAX_TASK_COUNT]);
+bool is_conflicting(const task_payload *newTask, const user_tasks *uts);
 bool append_task(const task_payload *newTask, user_tasks *uts);
 
 #endif // TASK_H

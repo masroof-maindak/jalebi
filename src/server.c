@@ -13,12 +13,12 @@
 #include "../include/server.h"
 #include "../include/threadpool.h"
 
-struct threadpool *commTp	 = NULL; /* Comm. threads for auth/receiving work */
-struct threadpool *workTp	 = NULL; /* internal threads for task-completion */
-struct answer_map *uuidToAns = NULL;
-struct user_map *uidToTasks	 = NULL;
-pthread_mutex_t answerMapMut = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t uidTasksMut	 = PTHREAD_MUTEX_INITIALIZER;
+struct threadpool *commTp = NULL; /* Comm. threads for auth/receiving work */
+struct threadpool *workTp = NULL; /* internal threads for task-completion */
+struct status_map *uuidToStatus	  = NULL;
+struct user_tasks_map *uidToTasks = NULL;
+pthread_mutex_t answerMapMut	  = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t uidTasksMut		  = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * @param arg a struct work_task holding details regarding a client's request
@@ -26,10 +26,7 @@ pthread_mutex_t uidTasksMut	 = PTHREAD_MUTEX_INITIALIZER;
 void *worker_thread(void *arg) {
 	worker_task *wt = arg;
 	user_tasks *uts = get_user_tasks(uidToTasks, wt->uid);
-	answer ans;
-
-	ans.status = 0;
-	uuid_copy(ans.uuid, wt->load.uuid);
+	enum STATUS st	= FAILURE;
 
 	wt->load.rt = identify_req_type(wt->load.buf);
 	if (wt->load.rt == INVALID) {
@@ -40,10 +37,12 @@ void *worker_thread(void *arg) {
 
 	/* Set global session info */
 	pthread_mutex_lock(&uidTasksMut);
-	while (uts && !is_conflicting(&wt->load, uts->tasks))
+	while (uts && !is_conflicting(&wt->load, uts))
 		pthread_cond_wait(&uts->condVar, &uidTasksMut);
 
-	(uts == NULL) && add_new_user(&uidToTasks, wt);
+	if (uts == NULL && !add_new_user(&uidToTasks, wt->uid))
+		/* TODO: we're cooked so just kill this thread */
+		perror("malloc() in add_new_user()");
 
 	if (!append_task(&wt->load, uts)) {
 		if ((send(wt->cfd, OVERLOAD_MSG, sizeof(OVERLOAD_MSG), 0)) == -1)
@@ -55,13 +54,13 @@ void *worker_thread(void *arg) {
 
 	switch (wt->load.rt) {
 	case VIEW:
-		ans.status = server_wrap_view(wt->cfd, wt->load.udir);
+		st = server_wrap_view(wt->cfd, wt->load.udir);
 		break;
 	case UPLOAD:
-		ans.status = server_wrap_download(wt->cfd, wt->load.buf, wt->load.udir);
+		st = server_wrap_download(wt->cfd, wt->load.buf, wt->load.udir);
 		break;
 	case DOWNLOAD:
-		ans.status = server_wrap_upload(wt->cfd, wt->load.buf, wt->load.udir);
+		st = server_wrap_upload(wt->cfd, wt->load.buf, wt->load.udir);
 		break;
 	default:
 		break;
@@ -69,22 +68,19 @@ void *worker_thread(void *arg) {
 
 	/* Unset global session info */
 	pthread_mutex_lock(&uidTasksMut);
-	/*
-	 * TODO: create a function that does the following internally:
-	 * if (--hashmap[uid].activeTaskCount == 0) {
-	 * 		delete_entry_from_hashmap(uid);
-	 * } else {
-	 * 		remove_this_uuids_task(hashmap, entry, uuid);
-	 *		pthread_cond_signal(&ui->condVar);
-	 * }
-	 */
+	if (--uts->count == 0) {
+		delete_from_user_map(&uidToTasks, wt->uid);
+	} else {
+		remove_this_uuids_task(hashmap, entry, uuid);
+		pthread_cond_signal(&uts->condVar);
+	}
 	pthread_mutex_unlock(&uidTasksMut);
 	/* ------------------------------- */
 
 write_answer:
 	/* write answer to hashmap */
 	pthread_mutex_lock(&answerMapMut);
-	if (add_to_answer_map(&uuidToAns, wt->load.uuid, &ans))
+	if (add_to_status_map(&uuidToStatus, wt->load.uuid, st))
 		/* TODO: we're cooked so just kill this thread */
 		perror("malloc() in add_to_answer_map()");
 	pthread_cond_signal(wt->cond);
@@ -147,12 +143,12 @@ void *client_thread(void *arg) {
 
 		/* watch answer hashmap */
 		/* TODO: timedwait + kill thread if no answer */
-		answer *ans = NULL;
+		enum STATUS *st = NULL;
 		pthread_mutex_lock(&answerMapMut);
-		while ((ans = get_answers(uuidToAns, wt->load.uuid)) == NULL)
+		while ((st = get_status(uuidToStatus, wt->load.uuid)) == NULL)
 			pthread_cond_wait(wt->cond, &answerMapMut);
-		status = ans->status;
-		delete_from_answer_map(&uuidToAns, wt->load.uuid);
+		status = *st;
+		delete_from_status_map(&uuidToStatus, wt->load.uuid);
 		pthread_mutex_unlock(&answerMapMut);
 
 		/* cleanup for next iteration */
@@ -213,7 +209,7 @@ cleanup:
 		break;
 	}
 
-	free_answer_map(&uuidToAns);
+	free_status_map(&uuidToStatus);
 	return status;
 }
 

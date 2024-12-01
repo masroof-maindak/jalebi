@@ -3,40 +3,38 @@
 
 #include <pthread.h>
 
-#include "answer.h"
 #include "bool.h"
 #include "task.h"
 #include "uthash.h"
 #include "utils.h"
 
-/* uuid_t -> answer */
-/* To let a client uniquely identify the answer generated for it */
-struct answer_map {
+enum STATUS { SUCCESS = 0, FAILURE = 1 };
+
+/* uuid_t -> status */
+/* To let a client uniquely identify the status of it's task */
+struct status_map {
 	uuid_t uuid;
-	answer *answers;
+	enum STATUS st;
 	UT_hash_handle hh;
 };
 
-bool add_to_answer_map(struct answer_map **map, uuid_t key, answer *answers);
-answer *get_answers(struct answer_map *map, uuid_t key);
-int delete_from_answer_map(struct answer_map **map, uuid_t key);
-bool key_exists_answer_map(struct answer_map *map, uuid_t key);
-int free_answer_map(struct answer_map **map);
+bool add_to_status_map(struct status_map **map, uuid_t key, enum STATUS status);
+enum STATUS *get_status(struct status_map *map, uuid_t key);
+int delete_from_status_map(struct status_map **map, uuid_t key);
+int free_status_map(struct status_map **map);
 
 /* uid -> { cond_t, count, tasks } */
 /* To prevent conflict when completing tasks for a user */
 
-struct user_map {
+struct user_tasks_map {
 	int64_t uid;
 	user_tasks *ut;
 	UT_hash_handle hh;
 };
 
-bool add_new_user(struct user_map **map, worker_task *info);
-user_tasks *get_user_tasks(struct user_map *map, int64_t key);
-int delete_from_user_map(struct user_map **map, int64_t key);
-bool key_exists_user_map(struct user_map *map, int64_t key);
-int free_user_map(struct user_map **map);
-int update_value_in_user_map(struct user_map **map, int64_t key,
-							 user_tasks new_ut);
+bool add_new_user(struct user_tasks_map **map, int64_t key);
+user_tasks *get_user_tasks(struct user_tasks_map *map, int64_t key);
+void delete_from_user_map(struct user_tasks_map **map, int64_t key);
+void free_user_map(struct user_tasks_map **map);
+
 #endif

@@ -3,7 +3,6 @@
 
 #include <pthread.h>
 
-#include "answer.h"
 #include "bool.h"
 #include "utils.h"
 
