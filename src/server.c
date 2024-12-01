@@ -25,7 +25,7 @@ pthread_mutex_t uidTasksMut		  = PTHREAD_MUTEX_INITIALIZER;
  */
 void *worker_thread(void *arg) {
 	worker_task *wt = arg;
-	user_tasks *uts = get_user_tasks(uidToTasks, wt->uid);
+	task_list *uts	= get_user_tasks(uidToTasks, wt->uid);
 	enum STATUS st	= FAILURE;
 
 	wt->load.rt = identify_req_type(wt->load.buf);

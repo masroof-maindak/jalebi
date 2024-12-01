@@ -28,12 +28,12 @@ int free_status_map(struct status_map **map);
 
 struct user_tasks_map {
 	int64_t uid;
-	user_tasks *ut;
+	task_list *ut;
 	UT_hash_handle hh;
 };
 
 bool add_new_user(struct user_tasks_map **map, int64_t key);
-user_tasks *get_user_tasks(struct user_tasks_map *map, int64_t key);
+task_list *get_user_tasks(struct user_tasks_map *map, int64_t key);
 void delete_from_user_map(struct user_tasks_map **map, int64_t key);
 void free_user_map(struct user_tasks_map **map);
 

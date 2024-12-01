@@ -26,9 +26,9 @@ typedef struct {
 	uint8_t count;
 	pthread_cond_t condVar;
 	task_payload tasks[MAX_TASK_COUNT];
-} user_tasks;
+} task_list;
 
-bool is_conflicting(const task_payload *newTask, const user_tasks *uts);
-bool append_task(const task_payload *newTask, user_tasks *uts);
+bool is_conflicting(const task_payload *newTask, const task_list *uts);
+bool append_task(const task_payload *newTask, task_list *uts);
 
 #endif // TASK_H

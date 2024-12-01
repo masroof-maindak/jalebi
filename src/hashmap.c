@@ -61,7 +61,7 @@ bool add_new_user(struct user_tasks_map **map, int64_t key) {
 	return true;
 }
 
-user_tasks *get_user_tasks(struct user_tasks_map *map, int64_t key) {
+task_list *get_user_tasks(struct user_tasks_map *map, int64_t key) {
 	struct user_tasks_map *entry;
 	HASH_FIND_INT(map, &key, entry);
 	if (entry == NULL)
