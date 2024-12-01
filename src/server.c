@@ -26,7 +26,7 @@ pthread_mutex_t uidMapMut	  = PTHREAD_MUTEX_INITIALIZER;
 void *worker_thread(void *arg) {
 	worker_task *wt = arg;
 	answer ans;
-	struct user_info *ui = get_userinfo(uidToReqType, wt->uid);
+	struct user_tasks *ut = get_usertasks(uidToReqType, wt->uid);
 
 	ans.status = 0;
 	uuid_copy(ans.uuid, wt->load.uuid);
@@ -40,8 +40,8 @@ void *worker_thread(void *arg) {
 
 	/* Set global session info */
 	pthread_mutex_lock(&uidMapMut);
-	while (ui && !is_conflicting(&wt->load, ui))
-		pthread_cond_wait(&ui->condVar, &uidMapMut);
+	while (ut && !is_conflicting(&wt->load, &ut->tasks))
+		pthread_cond_wait(&ut->condVar, &uidMapMut);
 
 	/*
 	 * If we're here, there is either no entry for this UID in the hashmap

@@ -54,24 +54,29 @@ int free_answer_map(struct answer_map **map) {
 	return 0;
 }
 
-bool add_to_user_map(struct user_map **map, int64_t key, struct user_info ui) {
+bool add_to_user_map(struct user_map **map, int64_t key, struct user_tasks ut) {
 	struct user_map *entry = malloc(sizeof(struct user_map));
 	if (entry == NULL)
 		return false;
 
 	entry->uid = key;
-	entry->ui  = ui;
+	pthread_cond_init(&ut.condVar, NULL);
+
+	entry->ut.condVar = ut.condVar;
+	entry->ut.count	  = ut.count;
+	entry->ut.tasks	  = ut.tasks;
+
 	HASH_ADD_INT(*map, uid, entry);
 	return true;
 }
 
-struct user_info *get_userinfo(struct user_map *map, int64_t key) {
+struct user_tasks *get_userinfo(struct user_map *map, int64_t key) {
 	struct user_map *entry;
 	HASH_FIND_INT(map, &key, entry);
 	if (entry == NULL)
 		return NULL;
 
-	return &entry->ui;
+	return &entry->ut;
 }
 
 int delete_from_user_map(struct user_map **map, int64_t key) {
@@ -81,7 +86,12 @@ int delete_from_user_map(struct user_map **map, int64_t key) {
 	if (entry == NULL)
 		return -1;
 
-	pthread_cond_destroy(&entry->ui.condVar);
+	pthread_cond_destroy(&entry->ut.condVar);
+
+	if (entry->ut.tasks != NULL) {
+		free(entry->ut.tasks);
+	}
+
 	HASH_DEL(*map, entry);
 	free(entry);
 	return 0;
@@ -99,7 +109,12 @@ int free_user_map(struct user_map **map) {
 
 	struct user_map *current_entry, *tmp;
 	HASH_ITER(hh, *map, current_entry, tmp) {
-		pthread_cond_destroy(&current_entry->ui.condVar);
+		pthread_cond_destroy(&current_entry->ut.condVar);
+
+		if (current_entry->ut.tasks != NULL) {
+			free(current_entry->ut.tasks);
+		}
+
 		HASH_DEL(*map, current_entry);
 		free(current_entry);
 	}
@@ -109,7 +124,7 @@ int free_user_map(struct user_map **map) {
 }
 
 int update_value_in_user_map(struct user_map **map, int64_t key,
-							 struct user_info new_ui) {
+							 struct user_tasks new_ut) {
 	if (map == NULL || *map == NULL)
 		return -1;
 
@@ -118,6 +133,12 @@ int update_value_in_user_map(struct user_map **map, int64_t key,
 	if (entry == NULL)
 		return -2;
 
-	entry->ui = new_ui;
+	pthread_cond_destroy(&entry->ut.condVar);
+	if (entry->ut.tasks != NULL) {
+		free(entry->ut.tasks);
+	}
+	pthread_cond_init(&new_ut.condVar, NULL);
+	entry->ut = new_ut;
+
 	return 0;
 }
