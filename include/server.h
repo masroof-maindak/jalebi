@@ -9,6 +9,7 @@
 
 typedef struct {
 	int cfd;
+	int64_t uid;
 	char *buf;
 	char *udir;
 	uuid_t uuid;

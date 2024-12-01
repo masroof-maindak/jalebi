@@ -131,6 +131,7 @@ void *client_thread(void *arg) {
 		wt->buf	 = buf;
 		wt->cfd	 = cfd;
 		wt->udir = udir;
+		wt->uid	 = uid;
 		pthread_cond_init(wt->cond, NULL);
 		uuid_generate_random(wt->uuid);
 		add_task(workTp, wt);
