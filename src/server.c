@@ -91,8 +91,9 @@ write_answer:
 	if (!add_new_status(&uuidToStatus, wt->load.uuid, st))
 		/* TODO: we're cooked so try to gracefully terminate/restart(?) */
 		perror("malloc() in add_to_answer_map()");
-	pthread_cond_signal(&wt->statCond);
 	pthread_mutex_unlock(&statusMapMut);
+
+	pthread_cond_signal(wt->statCond);
 
 	free(arg);
 }
@@ -111,6 +112,12 @@ void client_thread(void *arg) {
 
 	wt = malloc(sizeof(*wt));
 	if (wt == NULL) {
+		perror("malloc() in client_thread() - wt");
+		goto cleanup;
+	}
+
+	wt->statCond = malloc(sizeof(*wt->statCond));
+	if (wt->statCond == NULL) {
 		perror("malloc() in client_thread() - wt");
 		goto cleanup;
 	}
@@ -135,14 +142,14 @@ void client_thread(void *arg) {
 			perror("recv() in client_thread()");
 			goto cleanup;
 		} else if (n == 0) {
-			printf("client_thread(): client has closed socket\n");
+			printf("Client has closed socket\n");
 			goto cleanup;
 		}
 
 		/* push task to worker queue, alongside random UUID. */
 		wt->cfd = cfd;
 		wt->uid = uid;
-		pthread_cond_init(&wt->statCond, NULL);
+		pthread_cond_init(wt->statCond, NULL);
 		wt->load.buf  = buf;
 		wt->load.udir = udir;
 		uuid_generate_random(wt->load.uuid);
@@ -153,14 +160,13 @@ void client_thread(void *arg) {
 		enum STATUS *st = NULL;
 		pthread_mutex_lock(&statusMapMut);
 		while ((st = get_status(uuidToStatus, wt->load.uuid)) == NULL)
-			pthread_cond_wait(&wt->statCond, &statusMapMut);
+			pthread_cond_wait(wt->statCond, &statusMapMut);
 		status = *st;
 		delete_from_status_map(&uuidToStatus, wt->load.uuid);
 		pthread_mutex_unlock(&statusMapMut);
 
 		/* cleanup for next iteration */
-		pthread_cond_destroy(&wt->statCond);
-		memset(wt, 0, sizeof(*wt));
+		pthread_cond_destroy(wt->statCond);
 		memset(buf, 0, sizeof(buf));
 
 		if (status != 0)
@@ -169,6 +175,7 @@ void client_thread(void *arg) {
 
 cleanup:
 	printf(YELLOW "Thread performing cleanup\n");
+	free(wt->statCond);
 	free(wt);
 	if (close(cfd) == -1)
 		perror("close(cfd) in client_thread()");

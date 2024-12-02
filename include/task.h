@@ -18,7 +18,7 @@ typedef struct {
 typedef struct { /* task to be sent to a worker thread */
 	int cfd;
 	int64_t uid;
-	pthread_cond_t statCond; /* used to wait/signal hashmap storing response */
+	pthread_cond_t *statCond; /* used to wait/signal hashmap storing response */
 	task_payload load;
 } worker_task;
 
