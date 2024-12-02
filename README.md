@@ -22,8 +22,7 @@ sudo apt install libsqlite3-dev libssl-dev libreadline-dev libbsd-dev uuid-dev
 
 ### Todo
 
-- [x] Worker -> user-level session management
-- [x] Arena allocator
+- [ ] Arena allocator
 
 ---
 
@@ -35,7 +34,6 @@ sudo apt install libsqlite3-dev libssl-dev libreadline-dev libbsd-dev uuid-dev
 
 ---
 
-- [ ] Extrapolate readers-writers problem to file-level granularity
 - [ ] encoding/decoding
     - [ ] use an algorithm that guarantees a smaller result
     - [ ] function pointer-ed upload and download logic
