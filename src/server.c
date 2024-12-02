@@ -14,7 +14,7 @@
 #include "../include/server.h"
 #include "../include/threadpool.h"
 
-struct tpool *commTp = NULL; /* Comm. threads to auth/recv. tasks */
+struct tpool *commTp = NULL; /* Communication threads to auth/recv. tasks */
 struct tpool *workTp = NULL; /* internal threads to complete tasks */
 
 struct task_status_map *uuidToStatus = NULL;
@@ -25,7 +25,7 @@ pthread_mutex_t tasksMapMut			 = PTHREAD_MUTEX_INITIALIZER;
 /**
  * @param arg a struct work_task holding details regarding a client's request
  */
-void *worker_thread(void *arg) {
+void worker_thread(void *arg) {
 	worker_task *wt	  = arg;
 	task_list *uTasks = get_user_tasks(uidToTasks, wt->uid);
 	enum STATUS st	  = FAILURE;
@@ -95,13 +95,12 @@ write_answer:
 	pthread_mutex_unlock(&statusMapMut);
 
 	free(arg);
-	return NULL;
 }
 
 /**
  * @brief this thread will handle authentication and receiving a client's tasks
  */
-void *client_thread(void *arg) {
+void client_thread(void *arg) {
 	int cfd				= *(int *)arg;
 	int status			= 0;
 	int64_t uid			= -1;
@@ -173,8 +172,6 @@ cleanup:
 	free(wt);
 	if (close(cfd) == -1)
 		perror("close(cfd) in client_thread()");
-
-	return NULL;
 }
 
 int main() {

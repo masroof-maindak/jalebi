@@ -9,15 +9,15 @@ struct tpool {
 	size_t size;
 	struct queue *q;
 	pthread_t *threads;
-	void *(*fp)(void *);
+	void (*fp)(void *);
 	pthread_mutex_t lock;
 	pthread_cond_t notify;
 };
 
-struct tpool *create_tpool(size_t n, size_t elemSize, void *(*fp)(void *));
+struct tpool *create_tpool(size_t n, size_t elemSize, void (*fp)(void *));
 void delete_tpool(struct tpool *tp);
 
 void *internal_f(void *arg);
 void add_task(struct tpool *tp, void *data);
 
-#endif // THREADPOOL_H_H
+#endif // THREADPOOL_H

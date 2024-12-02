@@ -6,7 +6,7 @@
 /**
  * @brief create `n` threads, w/ entrypoint `fp`, and tasks of size `elemSize`
  */
-struct tpool *create_tpool(size_t n, size_t elemSize, void *(*fp)(void *)) {
+struct tpool *create_tpool(size_t n, size_t elemSize, void (*fp)(void *)) {
 	if (n == 0)
 		return NULL;
 
