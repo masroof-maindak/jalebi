@@ -41,7 +41,7 @@ void worker_thread(void *arg) {
 	pthread_mutex_lock(&tasksMapMut);
 
 	while (uTasks != NULL && !is_conflicting(&wt->load, uTasks))
-		pthread_cond_wait(&uTasks->userCond, &tasksMapMut);
+		pthread_cond_wait(uTasks->userCond, &tasksMapMut);
 
 	if (uTasks == NULL) {
 		if (!add_new_user(&uidToTasks, wt->uid)) {
@@ -82,7 +82,7 @@ void worker_thread(void *arg) {
 		delete_from_user_map(&uidToTasks, wt->uid);
 	} else {
 		remove_task_from_list(wt->load.uuid, uTasks);
-		pthread_cond_signal(&uTasks->userCond);
+		pthread_cond_signal(uTasks->userCond);
 	}
 	pthread_mutex_unlock(&tasksMapMut);
 

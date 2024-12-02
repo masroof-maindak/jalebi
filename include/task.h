@@ -24,7 +24,7 @@ typedef struct { /* task to be sent to a worker thread */
 
 typedef struct {
 	uint8_t count;
-	pthread_cond_t userCond; /* used to wait/signal task completion */
+	pthread_cond_t *userCond; /* used to wait/signal task completion */
 	task_payload tasks[MAX_TASK_COUNT];
 } task_list;
 
