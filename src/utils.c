@@ -188,7 +188,7 @@ int upload_file(const char *fname, size_t bytes, int sfd) {
 		bytesRead = fread(buf, 1, toWrite, fp);
 		if (bytesRead != toWrite) {
 			if (feof(fp)) {
-				fprintf(stderr, "fread() in upload_file - EOF occurred");
+				fprintf(stderr, "fread() in upload_file - EOF occurred\n");
 				ret = 2;
 				goto cleanup;
 			} else if (ferror(fp)) {
