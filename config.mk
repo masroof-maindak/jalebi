@@ -13,9 +13,9 @@ TARGETS = jalebi namak-paare
 PREFIX = /usr/local
 BINDIR = $(PREFIX)/bin
 
-COMMON_FILES = utils encode
+COMMON_FILES = utils
 CLIENT_FILES = $(COMMON_FILES) client
-SERVER_FILES = $(COMMON_FILES) server auth encode queue threadpool prodcons hashmap task
+SERVER_FILES = $(COMMON_FILES) server auth queue threadpool prodcons hashmap task
 
 CLIENT_OBJS = $(addprefix $(BUILDDIR)/,$(CLIENT_FILES:=.o))
 SERVER_OBJS = $(addprefix $(BUILDDIR)/,$(SERVER_FILES:=.o))

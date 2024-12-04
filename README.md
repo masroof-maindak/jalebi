@@ -20,23 +20,20 @@ sudo pacman -S lib32-sqlite lib32-openssl readline libbsd util-linux
 sudo apt install libsqlite3-dev libssl-dev libreadline-dev libbsd-dev uuid-dev
 ```
 
+### Usage
+
+```bash
+make all
+./jalebi      # server
+./namak-paare # client
+```
+
 ### Todo
 
-- [ ] Arena allocator
-
----
-
-- [ ] Refactor struct answer to simply be an enum status (the uuid\_t in the struct is unnecessary)
 - [ ] Thread monitoring - Restart killed threads, etc.
     - How to find out a thread's died?
-- [ ] close() -> shutdown() for sockets ?
+- [ ] close() -> shutdown() for sockets?
 - [ ] Signal handlers; gracefully deal w/ sockets/readline(?)/database/threadpool/etc.
-
----
-
-- [ ] encoding/decoding
-    - [ ] use an algorithm that guarantees a smaller result
-    - [ ] function pointer-ed upload and download logic
 
 ### Credits
 
