@@ -1,5 +1,7 @@
 # Jalebi
 
+![architecture](.github/assets/Jalebi.jpg)
+
 ### Dependencies
 
 - GNU Readline
