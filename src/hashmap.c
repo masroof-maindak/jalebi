@@ -1,8 +1,7 @@
-#include <stdio.h>
-
 #include "../include/hashmap.h"
 
-bool add_new_status(struct task_status_map **map, uuid_t key, enum STATUS st) {
+bool_t add_new_status(struct task_status_map **map, uuid_t key,
+					  enum STATUS st) {
 	struct task_status_map *entry = malloc(sizeof(struct task_status_map));
 	if (entry == NULL)
 		return false;
@@ -50,7 +49,7 @@ int free_status_map(struct task_status_map **map) {
 	return 0;
 }
 
-bool add_new_user(struct user_tasks_map **map, int64_t key) {
+bool_t add_new_user(struct user_tasks_map **map, int64_t key) {
 	struct user_tasks_map *newUser = malloc(sizeof(*newUser));
 	if (newUser == NULL)
 		return false;

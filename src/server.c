@@ -433,7 +433,7 @@ cleanup:
 	return st;
 }
 
-bool ensure_dir_exists(char *d) {
+bool_t ensure_dir_exists(char *d) {
 	struct stat st = {0};
 	if (stat(d, &st) == -1) {
 		if (mkdir(d, 0700) == -1) {

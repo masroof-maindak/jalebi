@@ -76,8 +76,8 @@ char select_mode() {
 }
 
 char *get_password(char *pw, uint8_t *pwLen) {
-	bool pwSuccess = false;
-	char *tmp	   = NULL;
+	bool_t pwSuccess = false;
+	char *tmp		 = NULL;
 
 	while (!pwSuccess) {
 		if ((tmp = readpassphrase("Password: ", pw, PW_MAX_LEN,
@@ -93,7 +93,7 @@ char *get_password(char *pw, uint8_t *pwLen) {
 }
 
 char *get_username(char *un, uint8_t *unLen) {
-	bool unSuccess = false;
+	bool_t unSuccess = false;
 
 	while (!unSuccess) {
 		if ((un = readline("Username: ")) == NULL)

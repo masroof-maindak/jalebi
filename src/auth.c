@@ -29,7 +29,7 @@ int init_db() {
 	return 0;
 }
 
-bool close_db() {
+bool_t close_db() {
 	int rc;
 	if ((rc = sqlite3_close(db)) != SQLITE_OK) {
 		fprintf(stderr, "sqlite3_close() in close_db(): %s\n",
@@ -49,9 +49,9 @@ void generate_rand_salt(char salt[SALT_LENGTH + 1]) {
 	salt[SALT_LENGTH] = '\0';
 }
 
-bool conc_salt_and_pw(char pwSalt[PW_MAX_LEN + SALT_LENGTH + 1],
-					  const char pw[PW_MAX_LEN],
-					  const unsigned char salt[SALT_LENGTH]) {
+bool_t conc_salt_and_pw(char pwSalt[PW_MAX_LEN + SALT_LENGTH + 1],
+						const char pw[PW_MAX_LEN],
+						const unsigned char salt[SALT_LENGTH]) {
 	return snprintf(pwSalt, PW_MAX_LEN + SALT_LENGTH + 1, "%s%s", pw, salt) < 0
 			   ? false
 			   : true;

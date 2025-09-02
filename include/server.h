@@ -22,7 +22,7 @@ void client_thread(void *arg);
 void worker_thread(void *arg);
 
 int init(int *sfd, struct sockaddr_in *saddr);
-bool ensure_dir_exists(char *dir);
+bool_t ensure_dir_exists(char *dir);
 int init_server_socket(struct sockaddr_in *saddr);
 
 int64_t authenticate_and_get_uid(int cfd, char *buf);

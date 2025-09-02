@@ -29,12 +29,12 @@
 	"INSERT INTO users (username, password, salt) VALUES (?, ?, ?);"
 
 int init_db();
-bool close_db();
+bool_t close_db();
 
 void generate_rand_salt(char salt[SALT_LENGTH + 1]);
-bool conc_salt_and_pw(char pwSalt[PW_MAX_LEN + SALT_LENGTH + 1],
-					  const char pw[PW_MAX_LEN],
-					  const unsigned char salt[SALT_LENGTH]);
+bool_t conc_salt_and_pw(char pwSalt[PW_MAX_LEN + SALT_LENGTH + 1],
+						const char pw[PW_MAX_LEN],
+						const unsigned char salt[SALT_LENGTH]);
 
 int64_t register_user(const char *username, const char *password);
 int64_t verify_user(const char *username, const char *password);

@@ -28,8 +28,8 @@ typedef struct {
 	task_payload tasks[MAX_TASK_COUNT];
 } task_list;
 
-bool is_conflicting(const task_payload *newTask, const task_list *uts);
-bool append_task(const task_payload *newTask, task_list *uts);
-bool remove_task_from_list(uuid_t uuid, task_list *uts);
+bool_t is_conflicting(const task_payload *newTask, const task_list *uts);
+bool_t append_task(const task_payload *newTask, task_list *uts);
+bool_t remove_task_from_list(uuid_t uuid, task_list *uts);
 
 #endif // TASK_H
