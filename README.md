@@ -12,7 +12,7 @@ Furthermore, I _am_ quite proud of certain things, for instance the novel archit
 
 ## Architecture
 
-![architecture](.github/assets/Jalebi.drawio.svg)
+![architecture](.github/assets/Jalebi.webp)
 
 ## Dependencies
 
