@@ -6,9 +6,9 @@ Jalebi (+ Namak Paare) is a peculiar little server-client application set respon
 
 Both binaries, but the server in particular, are to the best of my juvenile knowledge, quite robust in terms of error-handling, catering to imperfect input, and tiny nitpicks pertaining to the usage of certain syscalls/libc functions and ANSI-C compliance -- the lattermost notably requiring arcane knowledge uncovered by poring through tomes inscribed by wise sages of the past (i.e, reading manpages).
 
-In hindsight, there are a handful of things I could have improved upon, for instance 'typing' erroneous return values via enums, using the `sendfile()` syscall for some spicy zero-copy action via DMA (I don't regret doing it the 'manual way' my considering this was my first **proper** plunge into C sockets), minorly-incomplete clean-exiting for the threadpool, or some rather trivial `TODO`s, but I am choosing to leave this project as is to serve as a keepsake of days (and skill levels) bygone.
+In hindsight, there are a handful of things I could have improved upon, for instance 'typing' erroneous return values via enums, using the `sendfile()` syscall for some spicy zero-copy action via DMA (I don't regret doing it the 'manual way' considering this was my first **proper** foray into C sockets), minorly-incomplete clean-exiting for the threadpool, or some rather trivial `TODO`s, but I am choosing to leave this project as is to serve as a keepsake of days (and skill levels) bygone.
 
-Furthermore, I _am_ quite proud of certain things, for instance the novel architecture, profoundly graceful `cond_var_t` usage (or so I would like to delude myself), from-scratch, generic threadpool & queue implementations (albeit customary for C programmers, these provided a nice respite from wanting to bash my head against the wall whilst `x/`-ing my way through `gdb`).
+Furthermore, I _am_ quite proud of certain things, for instance the novel (albeit contrived) architecture, profoundly graceful `cond_var_t` usage (or so I would like to delude myself), and the from-scratch, _generic_ thread-pool & queue implementations, notwithstanding them being a staple for C programmers, provided a delectable respite from wanting to bash my head against the wall whilst `x/`-ing my way through `gdb`.
 
 ## Architecture
 
