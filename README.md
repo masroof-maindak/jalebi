@@ -1,6 +1,8 @@
 # Jalebi
 
-Jalebi (+ Namak Paare) is a peculiar little server-client application set responsible for creating an authenticated 'cloud-based' storage environemnt. I'm quite content with its current state and would consider it my first major C program -- one that taught me how to truly use/vastly enhanced my knowledge of an array of tools including but not limited to `TSan`, `Valgrind`, `gdb`, `perf` and most importantly, `man` pages.
+Jalebi (+ Namak Paare) is a peculiar little server-client application set responsible for creating an authenticated 'cloud-based' storage environment.
+
+I'm quite content with its current state and would consider it my first major C program -- one that taught me how to truly use/vastly enhanced my knowledge of an array of tools including but not limited to `TSan`, `Valgrind`, `gdb`, `perf` and most importantly, `man` pages.
 
 > It has also taught me how much I fucking hate *not* having a fixed, idiomatic way to handle errors, for instance Rust's Result types, or Go's error types.
 
@@ -47,7 +49,7 @@ make all
 ## TODOs
 
 - [ ] Thread monitoring - Restart killed threads, etc.
-    - How to find out a thread's died?
+    - How to find out a thread's died? Ping-ponging.
 - [ ] close() -> shutdown() for sockets?
 - [ ] Signal handlers; gracefully deal w/ sockets/readline(?)/database/threadpool/etc.
 
